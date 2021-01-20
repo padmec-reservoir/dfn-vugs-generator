@@ -2,6 +2,10 @@ import numpy as np
 
 class DFNMeshGenerator(object):
     """
-    docstring
+    A mesh generator for fracured and vuggy reservoirs.
     """
-    pass
+    def __init__(self):
+        """
+        Constructor
+        """
+        pass
