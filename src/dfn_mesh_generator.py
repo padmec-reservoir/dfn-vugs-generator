@@ -15,10 +15,12 @@ class DFNMeshGenerator(object):
         Inputs
         ------
         mesh_file (String): A string containing the path to the input mesh file.
+
         ellipsis_params_range (iterable of size 2): A iterable containing the maximum and the
         minimum value for the ellipsoids parameters.
-        num_ellipsoids (int): the number of ellipsoids to create.
 
+        num_ellipsoids (int): the number of ellipsoids to create.
+        
         """
         self.mesh = FineScaleMesh(mesh_file)
         self.ellipsis_params_range = ellipsis_params_range
@@ -54,18 +56,6 @@ class DFNMeshGenerator(object):
         self.compute_fractures(vols_per_ellipsoid, centers, angles, params, centroids)
         print('Done!')
 
-        # Ensure all fractures are continuous.
-        # vols_in_fracture_indices = np.where(self.mesh.vug[:].flatten() == 2)[0]
-        # non_vugs_vols_indices = np.where(self.mesh.vug[:].flatten() == 0)[0]
-        # vols_in_fracture_handles = self.mesh.volumes.elements_handle[vols_in_fracture_indices]
-        # non_vugs_vols_handles = self.mesh.volumes.elements_handle[non_vugs_vols_indices]
-        # neighbors = rng.intersect(
-        #     self.mesh.core.mtu.get_bridge_adjacencies(vols_in_fracture_handles, 2, 3),
-        #     non_vugs_vols_handles)
-        # neighbors_id = self.mesh.core.mb.tag_get_data(
-        #     self.mesh.volumes.global_handle, neighbors, flat=True)
-        # self.mesh.vug[neighbors_id] = 2
-
     def compute_vugs(self, centers, angles, params, centroids):
         """
         Generates random ellipsoids and computes the volumes inside those
@@ -76,10 +66,13 @@ class DFNMeshGenerator(object):
         ------
         centers (numpy array): Array containing the cartesian coordinates of
         each ellipsoid center.
+
         angles (numpy array): Array containing the values (in radians) of the
         three rotation angles with respect to the cartesian axis.
+
         params (numpy array): Array containing the parameters of each ellipsoid, i.e,
-        the size of the axis;
+        the size of the axis.
+
         centroids (numpy array): The centroids of the volumes compouding the mesh.
 
         Output
@@ -111,12 +104,16 @@ class DFNMeshGenerator(object):
         ------
         vols_per_ellipsoid (list): A list of Pymoab's ranges describing the volumes
         inside each ellipsoid.
+
         centers (numpy array): Array containing the cartesian coordinates of
         each ellipsoid center.
+
         angles (numpy array): Array containing the values (in radians) of the
         three rotation angles with respect to the cartesian axis.
+
         params (numpy array): Array containing the parameters of each ellipsoid, i.e,
-        the size of the axis;
+        the size of the axis.
+
         centroids (numpy array): The centroids of the volumes compouding the mesh.
 
         Output
@@ -141,22 +138,6 @@ class DFNMeshGenerator(object):
 
             self.check_intersections(r, L, centers[e1], centers[e2])
 
-            # # Calculating the distance from the centroids to the main axis of the cylinder.
-            # u = centroids - centers[e1]
-            # v = centroids - centers[e2]
-            # ds = np.cross(u, v) / L
-            # ds = np.linalg.norm(ds, axis=1)
-            # # Calculating the size of the projection of the centroids onto the line
-            # # defined by the ellipsoids's centers.
-            # w = centers[e2] - centers[e1]
-            # proj_centroids = u.dot(w) / np.linalg.norm(w)
-            # # If the distance from the centroid to the cylinder's axis is less than the radius
-            # # and the size of the projection is in the interval (0, L), i.e., between the centers
-            # # and the volume is not already part of a vug, then it is a fracture.
-            # all_vugs = self.mesh.vug[:].flatten()
-            # import pdb; pdb.set_trace()
-            # self.mesh.vug[(ds < r) & (proj_centroids < L) & (proj_centroids > 0) & (all_vugs == 0)] = 2
-    
     def check_intersections(self, R, L, c1, c2):
         """
         Verify which volumes are intersected by fracture.
@@ -255,8 +236,10 @@ class DFNMeshGenerator(object):
         ------
         x_range (iterable of size 2): A iterable containing the maximum and minimum 
         values of the x coordinate.
+
         y_range (iterable of size 2): A iterable containing the maximum and minimum 
         values of the y coordinate.
+
         z_range (iterable of size 2): A iterable containing the maximum and minimum 
         values of the z coordinate.
 
@@ -264,8 +247,10 @@ class DFNMeshGenerator(object):
         -------
         random_centers (num_ellipsoids x 3 numpy array): The generated center 
         points for the ellipsoids.
+
         random_params (num_ellipsoids x 3 numpy array): The parameters a.k.a 
         the size of the three axis of the ellipsoids.
+
         random_angles (num_ellipsoids x 3 numpy array): The rotation angles 
         for each ellipsoid.
         
