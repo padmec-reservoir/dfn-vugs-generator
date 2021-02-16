@@ -121,7 +121,7 @@ class DFNMeshGenerator(object):
         None
 
         """
-        random_rng = np.random.default_rng()
+        random_rng = np.random.default_rng(42)
         selected_pairs = []
         for _ in range(self.num_fractures):
             # Find a pair of ellipsoids that are not overlapped and are
@@ -146,7 +146,6 @@ class DFNMeshGenerator(object):
 
         print("Checking nodes inside cylinder")
         vertices = self.mesh.nodes.coords[:]
-        # vertices = self.mesh.volumes.center[:]
 
         # Cylinder's vector parameters.
         e = c2 - c1
@@ -170,45 +169,46 @@ class DFNMeshGenerator(object):
         self.mesh.vug[non_vug_volumes] = 2
         
         # Check if the cylinder's axis intercept any of the faces of a volume.
-        # order = MPFAD2DOrdering(self.mesh.nodes, "edges")
-        # faces = self.mesh.faces.all[:]
-        # print("Checking intersection between axis and faces")
-        # for face in faces:
-        #     face_nodes = self.mesh.faces.bridge_adjacencies(face, "edges", 
-        #                                                     "nodes", ordering_inst=order)
-        #     v0, v1, v2 = self.mesh.nodes.coords[face_nodes[0:3]]
-        #     n = np.cross(v1 - v0, v2 - v0)
-        #     denom = n.dot(v0 - c1)
-        #     num = n.dot(c2 - c1)
-        #     if np.abs(denom) < 1e-6:
-        #         continue
-        #     elif num / denom < 0 or num / denom > 1:
-        #         continue
-        #     r = num / denom
-        #     # Point of intersection between the plane defined by the face 
-        #     # and the axis.
-        #     P = c1 + r*(c2 - c1)
-        #     angle_sum = 0
-        #     n = len(face_nodes)
-        #     for i in range(n):
-        #         p0, p1 = face_nodes[i], face_nodes[(i+1) % n]
-        #         u = p0 - P
-        #         v = p1 - P
-        #         norm_prod = np.linalg.norm(u)*np.linalg.norm(v)
-        #         # If the point of intersection is too close to a vertex, then
-        #         # take it as the vertex itself.
-        #         if norm_prod <= 1e-6:
-        #             angle_sum = 2*np.pi
-        #             break
-        #         cos_theta = u.dot(v) / norm_prod
-        #         theta = np.arccos(cos_theta)
-        #         angle_sum += theta
-        #     # If the sum of the angles around the intersection point is 2*pi, then
-        #     # the point is inside the polygon.
-        #     volumes_sharing_face = self.mesh.faces.bridge_adjacencies(face, "faces", "volumes")
-        #     non_vugs_volumes = [volume for volume in volumes_sharing_face if self.mesh.vug[volume] == 0]
-        #     if np.abs(2*np.pi - angle_sum) < 1e-6 and len(non_vugs_volumes) > 0:
-        #         self.mesh.vug[non_vugs_volumes] = 2
+        order = MPFAD2DOrdering(self.mesh.nodes, "edges")
+        faces = self.mesh.faces.all[:]
+        print("Checking intersection between axis and faces")
+        for face in faces:
+            face_nodes = self.mesh.faces.bridge_adjacencies(face, "edges", 
+                                                            "nodes", ordering_inst=order)
+            v0, v1, v2 = self.mesh.nodes.coords[face_nodes[0:3]]
+            normal = np.cross(v1 - v0, v2 - v0)
+            denom = normal.dot(c2 - c1)
+            num = normal.dot(v0 - c1)
+            if np.abs(denom) < 1e-6:
+                continue
+            elif num / denom < 0 or num / denom > 1:
+                continue
+            r = num / denom
+            # Point of intersection between the plane defined by the face 
+            # and the axis.
+            P = c1 + r*(c2 - c1)
+            angle_sum = 0
+            n = len(face_nodes)
+            face_nodes_coords = self.mesh.nodes.coords[face_nodes]
+            for i in range(n):
+                p0, p1 = face_nodes_coords[i], face_nodes_coords[(i+1) % n]
+                a = p0 - P
+                b = p1 - P
+                norm_prod = np.linalg.norm(a)*np.linalg.norm(b)
+                # If the point of intersection is too close to a vertex, then
+                # take it as the vertex itself.
+                if norm_prod <= 1e-6:
+                    angle_sum = 2*np.pi
+                    break
+                cos_theta = a.dot(b) / norm_prod
+                theta = np.arccos(cos_theta)
+                angle_sum += theta
+            # If the sum of the angles around the intersection point is 2*pi, then
+            # the point is inside the polygon.
+            volumes_sharing_face = self.mesh.faces.bridge_adjacencies(face, "faces", "volumes")
+            non_vugs_volumes = [volume for volume in volumes_sharing_face if self.mesh.vug[volume] == 0]
+            if np.abs(2*np.pi - angle_sum) < 1e-6 and len(non_vugs_volumes) > 0:
+                self.mesh.vug[non_vugs_volumes] = 2
 
     def write_file(self, path="results/vugs.vtk"):
         """
@@ -255,7 +255,7 @@ class DFNMeshGenerator(object):
         for each ellipsoid.
         
         """
-        random_rng = np.random.default_rng()
+        random_rng = np.random.default_rng(42)
         random_centers = np.zeros((self.num_ellipsoids, 3))
 
         random_centers[:, 0] = random_rng.uniform(low=x_range[0], high=x_range[1], size=self.num_ellipsoids)
