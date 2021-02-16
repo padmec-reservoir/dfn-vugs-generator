@@ -60,7 +60,7 @@ class DFNMeshGenerator(object):
         # vols_in_fracture_handles = self.mesh.volumes.elements_handle[vols_in_fracture_indices]
         # non_vugs_vols_handles = self.mesh.volumes.elements_handle[non_vugs_vols_indices]
         # neighbors = rng.intersect(
-        #     self.mesh.core.mtu.get_bridge_adjacencies(vols_in_fracture_handles, 1, 3),
+        #     self.mesh.core.mtu.get_bridge_adjacencies(vols_in_fracture_handles, 2, 3),
         #     non_vugs_vols_handles)
         # neighbors_id = self.mesh.core.mb.tag_get_data(
         #     self.mesh.volumes.global_handle, neighbors, flat=True)
@@ -124,7 +124,7 @@ class DFNMeshGenerator(object):
         None
 
         """
-        random_rng = np.random.default_rng(42)
+        random_rng = np.random.default_rng()
         selected_pairs = []
         for _ in range(self.num_fractures):
             # Find a pair of ellipsoids that are not overlapped and are
@@ -133,7 +133,7 @@ class DFNMeshGenerator(object):
                 e1, e2 = random_rng.choice(np.arange(self.num_ellipsoids), size=2, replace=False)
                 if (e1, e2) not in selected_pairs and \
                         rng.intersect(vols_per_ellipsoid[e1], vols_per_ellipsoid[e2]).empty():
-                    selected_pairs.append((e1, e2))
+                    selected_pairs.extend([(e1, e2), (e2, e1)])
                     break
             # Calculating the cylinder's parameters.
             L = np.linalg.norm(centers[e1] - centers[e2])   # Length
@@ -195,7 +195,7 @@ class DFNMeshGenerator(object):
         # for face in faces:
         #     face_nodes = self.mesh.faces.bridge_adjacencies(face, "edges", 
         #                                                     "nodes", ordering_inst=order)
-        #     v0, v1, v2 = self.mesh.nodes.coords(face_nodes[0:3])
+        #     v0, v1, v2 = self.mesh.nodes.coords[face_nodes[0:3]]
         #     n = np.cross(v1 - v0, v2 - v0)
         #     denom = n.dot(v0 - c1)
         #     num = n.dot(c2 - c1)
@@ -270,7 +270,7 @@ class DFNMeshGenerator(object):
         for each ellipsoid.
         
         """
-        random_rng = np.random.default_rng(42)
+        random_rng = np.random.default_rng()
         random_centers = np.zeros((self.num_ellipsoids, 3))
 
         random_centers[:, 0] = random_rng.uniform(low=x_range[0], high=x_range[1], size=self.num_ellipsoids)
