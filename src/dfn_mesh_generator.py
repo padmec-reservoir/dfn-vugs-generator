@@ -1,13 +1,14 @@
 import numpy as np
 from scipy.special import comb
 from pymoab import rng
-from impress.preprocessor.meshHandle.finescaleMesh import FineScaleMesh
+from preprocessor.meshHandle.finescaleMesh import FineScaleMesh
+from preprocessor.element_order.MPFAD2DOrdering import MPFAD2DOrdering
 
 class DFNMeshGenerator(object):
     """
     A mesh generator for fracured and vuggy reservoirs.
     """
-    def __init__(self, mesh_file, ellipsis_params_range, num_ellipsoids=10, num_fractures=5):
+    def __init__(self, mesh_file, ellipsis_params_range, num_ellipsoids, num_fractures):
         """
         Constructor method.
 
@@ -47,20 +48,23 @@ class DFNMeshGenerator(object):
         z_range = zs.min(), zs.max()
         centers, params, angles = self.get_random_ellipsoids(x_range, y_range, z_range)
 
+        print('Computing vugs')
         vols_per_ellipsoid = self.compute_vugs(centers, angles, params, centroids)
+        print('Computing fractures')
         self.compute_fractures(vols_per_ellipsoid, centers, angles, params, centroids)
+        print('Done!')
 
         # Ensure all fractures are continuous.
-        vols_in_fracture_indices = np.where(self.mesh.vug[:].flatten() == 2)[0]
-        non_vugs_vols_indices = np.where(self.mesh.vug[:].flatten() == 0)[0]
-        vols_in_fracture_handles = self.mesh.volumes.elements_handle[vols_in_fracture_indices]
-        non_vugs_vols_handles = self.mesh.volumes.elements_handle[non_vugs_vols_indices]
-        neighbors = rng.intersect(
-            self.mesh.core.mtu.get_bridge_adjacencies(vols_in_fracture_handles, 1, 3),
-            non_vugs_vols_handles)
-        neighbors_id = self.mesh.core.mb.tag_get_data(
-            self.mesh.volumes.global_handle, neighbors, flat=True)
-        self.mesh.vug[neighbors_id] = 2
+        # vols_in_fracture_indices = np.where(self.mesh.vug[:].flatten() == 2)[0]
+        # non_vugs_vols_indices = np.where(self.mesh.vug[:].flatten() == 0)[0]
+        # vols_in_fracture_handles = self.mesh.volumes.elements_handle[vols_in_fracture_indices]
+        # non_vugs_vols_handles = self.mesh.volumes.elements_handle[non_vugs_vols_indices]
+        # neighbors = rng.intersect(
+        #     self.mesh.core.mtu.get_bridge_adjacencies(vols_in_fracture_handles, 1, 3),
+        #     non_vugs_vols_handles)
+        # neighbors_id = self.mesh.core.mb.tag_get_data(
+        #     self.mesh.volumes.global_handle, neighbors, flat=True)
+        # self.mesh.vug[neighbors_id] = 2
 
     def compute_vugs(self, centers, angles, params, centroids):
         """
@@ -120,7 +124,7 @@ class DFNMeshGenerator(object):
         None
 
         """
-        random_rng = np.random.default_rng()
+        random_rng = np.random.default_rng(42)
         selected_pairs = []
         for _ in range(self.num_fractures):
             # Find a pair of ellipsoids that are not overlapped and are
@@ -134,20 +138,96 @@ class DFNMeshGenerator(object):
             # Calculating the cylinder's parameters.
             L = np.linalg.norm(centers[e1] - centers[e2])   # Length
             r = 10 / L  # Radius
-            # Calculating the distance from the centroids to the main axis of the cylinder.
-            u = centroids - centers[e1]
-            v = centroids - centers[e2]
-            ds = np.cross(u, v) / L
-            ds = np.sqrt((ds**2).sum(axis=1))
-            # Calculating the size of the projection of the centroids onto the line
-            # defined by the ellipsoids's centers.
-            w = centers[e2] - centers[e1]
-            proj_centroids = u.dot(w) / np.linalg.norm(w)
-            # If the distance from the centroid to the cylinder's axis is less than the radius
-            # and the size of the projection is in the interval (0, L), i.e., between the centers
-            # and the volume is not already part of a vug, then it is a fracture.
-            all_vugs = self.mesh.vug[:].flatten()
-            self.mesh.vug[(ds < r) & (proj_centroids < L) & (proj_centroids > 0) & (all_vugs == 0)] = 2
+
+            self.check_intersections(r, L, centers[e1], centers[e2])
+
+            # # Calculating the distance from the centroids to the main axis of the cylinder.
+            # u = centroids - centers[e1]
+            # v = centroids - centers[e2]
+            # ds = np.cross(u, v) / L
+            # ds = np.linalg.norm(ds, axis=1)
+            # # Calculating the size of the projection of the centroids onto the line
+            # # defined by the ellipsoids's centers.
+            # w = centers[e2] - centers[e1]
+            # proj_centroids = u.dot(w) / np.linalg.norm(w)
+            # # If the distance from the centroid to the cylinder's axis is less than the radius
+            # # and the size of the projection is in the interval (0, L), i.e., between the centers
+            # # and the volume is not already part of a vug, then it is a fracture.
+            # all_vugs = self.mesh.vug[:].flatten()
+            # import pdb; pdb.set_trace()
+            # self.mesh.vug[(ds < r) & (proj_centroids < L) & (proj_centroids > 0) & (all_vugs == 0)] = 2
+    
+    def check_intersections(self, R, L, c1, c2):
+        """
+        Verify which volumes are intersected by fracture.
+        """
+        print("Checking intersections for fracture")
+
+        print("Checking nodes inside cylinder")
+        vertices = self.mesh.nodes.coords[:]
+        # vertices = self.mesh.volumes.center[:]
+
+        # Cylinder's vector parameters.
+        e = c2 - c1
+        m = np.cross(c1, c2)
+
+        # Calculating the distance between the vertices and the main axis.
+        d_vector = m + np.cross(e, vertices)
+        d = np.linalg.norm(d_vector, axis=1) / L
+
+        # Computing the projection of the vertices onto the cylinder's axis.
+        u = vertices - c1
+        proj_vertices = u.dot(e) / L
+
+        # Checking which vertices are inside the cylinder.
+        vertices_in_cylinder = self.mesh.nodes.all[(d <= R) & (proj_vertices >= 0) & (proj_vertices <= L)]
+        volumes_in_cylinder = np.concatenate(self.mesh.nodes.bridge_adjacencies(vertices_in_cylinder, 
+                                                                                "edges", "volumes")).ravel()
+        volumes_in_cylinder = np.unique(volumes_in_cylinder)
+        volumes_vug_value = self.mesh.vug[volumes_in_cylinder].flatten()
+        non_vug_volumes = volumes_in_cylinder[volumes_vug_value == 0]
+        self.mesh.vug[non_vug_volumes] = 2
+        
+        # Check if the cylinder's axis intercept any of the faces of a volume.
+        # order = MPFAD2DOrdering(self.mesh.nodes, "edges")
+        # faces = self.mesh.faces.all[:]
+        # print("Checking intersection between axis and faces")
+        # for face in faces:
+        #     face_nodes = self.mesh.faces.bridge_adjacencies(face, "edges", 
+        #                                                     "nodes", ordering_inst=order)
+        #     v0, v1, v2 = self.mesh.nodes.coords(face_nodes[0:3])
+        #     n = np.cross(v1 - v0, v2 - v0)
+        #     denom = n.dot(v0 - c1)
+        #     num = n.dot(c2 - c1)
+        #     if np.abs(denom) < 1e-6:
+        #         continue
+        #     elif num / denom < 0 or num / denom > 1:
+        #         continue
+        #     r = num / denom
+        #     # Point of intersection between the plane defined by the face 
+        #     # and the axis.
+        #     P = c1 + r*(c2 - c1)
+        #     angle_sum = 0
+        #     n = len(face_nodes)
+        #     for i in range(n):
+        #         p0, p1 = face_nodes[i], face_nodes[(i+1) % n]
+        #         u = p0 - P
+        #         v = p1 - P
+        #         norm_prod = np.linalg.norm(u)*np.linalg.norm(v)
+        #         # If the point of intersection is too close to a vertex, then
+        #         # take it as the vertex itself.
+        #         if norm_prod <= 1e-6:
+        #             angle_sum = 2*np.pi
+        #             break
+        #         cos_theta = u.dot(v) / norm_prod
+        #         theta = np.arccos(cos_theta)
+        #         angle_sum += theta
+        #     # If the sum of the angles around the intersection point is 2*pi, then
+        #     # the point is inside the polygon.
+        #     volumes_sharing_face = self.mesh.faces.bridge_adjacencies(face, "faces", "volumes")
+        #     non_vugs_volumes = [volume for volume in volumes_sharing_face if self.mesh.vug[volume] == 0]
+        #     if np.abs(2*np.pi - angle_sum) < 1e-6 and len(non_vugs_volumes) > 0:
+        #         self.mesh.vug[non_vugs_volumes] = 2
 
     def write_file(self, path="results/vugs.vtk"):
         """
@@ -190,7 +270,7 @@ class DFNMeshGenerator(object):
         for each ellipsoid.
         
         """
-        random_rng = np.random.default_rng()
+        random_rng = np.random.default_rng(42)
         random_centers = np.zeros((self.num_ellipsoids, 3))
 
         random_centers[:, 0] = random_rng.uniform(low=x_range[0], high=x_range[1], size=self.num_ellipsoids)
