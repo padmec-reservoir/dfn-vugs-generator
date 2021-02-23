@@ -122,7 +122,7 @@ class DFNMeshGenerator(object):
         """
         random_rng = np.random.default_rng(42)
         selected_pairs = []
-        for _ in range(self.num_fractures):
+        for i in range(self.num_fractures):
             # Find a pair of ellipsoids that are not overlapped and are
             # not already connected by a fracture.
             while True:
@@ -135,15 +135,28 @@ class DFNMeshGenerator(object):
             L = np.linalg.norm(centers[e1] - centers[e2])   # Length
             r = 10 / L  # Radius
 
+            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
             self.check_intersections(r, L, centers[e1], centers[e2])
 
     def check_intersections(self, R, L, c1, c2):
         """
-        Verify which volumes are intersected by fracture.
-        """
-        print("Checking intersections for fracture")
+        Check which volumes are inside the fracture.
 
-        print("Checking nodes inside cylinder")
+        Inputs
+        ------
+        R (float): Cylinder's radius
+
+        L (float): Cylinder's length
+
+        c1 (numpy array): Left end of the cylinder's axis.
+
+        c2 (numpy array): Right end of the cylinder's axis.
+
+        Output
+        ------
+        None
+        
+        """
         vertices = self.mesh.nodes.coords[:]
 
         # Cylinder's vector parameters.
