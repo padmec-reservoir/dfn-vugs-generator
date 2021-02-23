@@ -180,36 +180,34 @@ class DFNMeshGenerator(object):
         non_zero_denom = denom[np.abs(denom) > 1e-6]
         non_zero_num = num[np.abs(denom) > 1e-6]
         r = non_zero_num / non_zero_denom
-        filtered_nodes = nodes_coords[(r >= 0) & (r <= 1)]
-        filtered_faces = faces[(r >= 0) & (r <= 1)]
+        filtered_faces = faces[np.abs(denom) > 1e-6]
+        filtered_faces = filtered_faces[(r >= 0) & (r <= 1)]
+        filtered_nodes = nodes_coords[np.abs(denom) > 1e-6]
+        filtered_nodes = filtered_nodes[(r >= 0) & (r <= 1)]
         r = r[(r >= 0) & (r <= 1)]
         P = c1 + r[:, np.newaxis]*(c2 - c1)
 
-        # TODO: how to vectorize the step to check if a point lies
-        # inside the face?
-
-        for face, face_nodes_coords, P_i in zip(filtered_faces, filtered_nodes, P):
-            angle_sum = 0
-            n = len(face_nodes_coords)
-            for i in range(n):
-                p0, p1 = face_nodes_coords[i], face_nodes_coords[(i+1) % n]
-                a = p0 - P_i
-                b = p1 - P_i
-                norm_prod = np.linalg.norm(a)*np.linalg.norm(b)
-                # If the point of intersection is too close to a vertex, then
-                # take it as the vertex itself.
-                if norm_prod <= 1e-6:
-                    angle_sum = 2*np.pi
-                    break
-                cos_theta = a.dot(b) / norm_prod
-                theta = np.arccos(cos_theta)
-                angle_sum += theta
-            # If the sum of the angles around the intersection point is 2*pi, then
-            # the point is inside the polygon.
-            volumes_sharing_face = self.mesh.faces.bridge_adjacencies(face, "faces", "volumes")
-            non_vugs_volumes = [volume for volume in volumes_sharing_face if self.mesh.vug[volume] == 0]
-            if np.abs(2*np.pi - angle_sum) < 1e-6 and len(non_vugs_volumes) > 0:
-                self.mesh.vug[non_vugs_volumes] = 2
+        angle_sum = np.zeros(filtered_nodes.shape[0])
+        n = filtered_nodes.shape[1]
+        for i in range(n):
+            p0, p1 = filtered_nodes[:, i, :], filtered_nodes[:, (i+1) % n, :]
+            a = p0 - P
+            b = p1 - P
+            norm_prod = np.linalg.norm(a, axis=1)*np.linalg.norm(b, axis=1)
+            # If the point of intersection is too close to a vertex, then
+            # take it as the vertex itself.
+            angle_sum[norm_prod <= 1e-6] = 2*np.pi
+            cos_theta = np.einsum("ij,ij->i", a, b) / norm_prod
+            theta = np.arccos(cos_theta)
+            angle_sum += theta
+        # If the sum of the angles around the intersection point is 2*pi, then
+        # the point is inside the polygon.
+        intersected_faces = filtered_faces[np.abs(2*np.pi - angle_sum) < 1e-6]
+        volumes_sharing_face = self.mesh.faces.bridge_adjacencies(intersected_faces, "faces", "volumes")
+        unique_volumes = np.unique(volumes_sharing_face.ravel())
+        unique_volumes_vug_values = self.mesh.vug[unique_volumes].flatten()
+        non_vug_volumes = unique_volumes[unique_volumes_vug_values == 0]
+        self.mesh.vug[non_vug_volumes] = 2
 
     def write_file(self, path="results/vugs.vtk"):
         """
