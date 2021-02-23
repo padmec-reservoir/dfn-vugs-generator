@@ -2,7 +2,6 @@ import numpy as np
 from scipy.special import comb
 from pymoab import rng
 from preprocessor.meshHandle.finescaleMesh import FineScaleMesh
-from preprocessor.element_order.MPFAD2DOrdering import MPFAD2DOrdering
 
 class DFNMeshGenerator(object):
     """
@@ -168,32 +167,34 @@ class DFNMeshGenerator(object):
         non_vug_volumes = volumes_in_cylinder[volumes_vug_value == 0]
         self.mesh.vug[non_vug_volumes] = 2
         
-        # Check if the cylinder's axis intercept any of the faces of a volume.
-        order = MPFAD2DOrdering(self.mesh.nodes, "edges")
         faces = self.mesh.faces.all[:]
-        print("Checking intersection between axis and faces")
-        for face in faces:
-            face_nodes = self.mesh.faces.bridge_adjacencies(face, "edges", 
-                                                            "nodes", ordering_inst=order)
-            v0, v1, v2 = self.mesh.nodes.coords[face_nodes[0:3]]
-            normal = np.cross(v1 - v0, v2 - v0)
-            denom = normal.dot(c2 - c1)
-            num = normal.dot(v0 - c1)
-            if np.abs(denom) < 1e-6:
-                continue
-            elif num / denom < 0 or num / denom > 1:
-                continue
-            r = num / denom
-            # Point of intersection between the plane defined by the face 
-            # and the axis.
-            P = c1 + r*(c2 - c1)
+        nodes_from_faces = self.mesh.faces.connectivities(faces)
+        nodes_coords = np.array([self.mesh.nodes.coords[nodes] for nodes in nodes_from_faces])
+
+        # Check if the cylinder's axis intercept any of the faces of a volume and
+        # compute the point of intersection.
+        normal = np.cross(nodes_coords[:, 1, :] - nodes_coords[:, 0, :],
+                          nodes_coords[:, 2, :] - nodes_coords[:, 0, :])
+        denom = normal.dot(c2 - c1)
+        num = np.einsum("ij,ij->i", normal, nodes_coords[:, 0, :] - c1)
+        non_zero_denom = denom[np.abs(denom) > 1e-6]
+        non_zero_num = num[np.abs(denom) > 1e-6]
+        r = non_zero_num / non_zero_denom
+        filtered_nodes = nodes_coords[(r >= 0) & (r <= 1)]
+        filtered_faces = faces[(r >= 0) & (r <= 1)]
+        r = r[(r >= 0) & (r <= 1)]
+        P = c1 + r[:, np.newaxis]*(c2 - c1)
+
+        # TODO: how to vectorize the step to check if a point lies
+        # inside the face?
+
+        for face, face_nodes_coords, P_i in zip(filtered_faces, filtered_nodes, P):
             angle_sum = 0
-            n = len(face_nodes)
-            face_nodes_coords = self.mesh.nodes.coords[face_nodes]
+            n = len(face_nodes_coords)
             for i in range(n):
                 p0, p1 = face_nodes_coords[i], face_nodes_coords[(i+1) % n]
-                a = p0 - P
-                b = p1 - P
+                a = p0 - P_i
+                b = p1 - P_i
                 norm_prod = np.linalg.norm(a)*np.linalg.norm(b)
                 # If the point of intersection is too close to a vertex, then
                 # take it as the vertex itself.
