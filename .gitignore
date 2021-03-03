@@ -1,3 +1,5 @@
 run_docker.sh
 __pycache__
 test-files/
+.devcontainer/
+.vscode/
