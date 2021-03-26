@@ -50,15 +50,138 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
             raise ValueError(
                 "The number of fractures must be inferior to the number of possible pairs of ellipsis.")
         self.num_fractures = num_fractures
+        self.random_rng = np.random.default_rng()
 
     def run(self):
-        pass
+        centroids = self.mesh.faces.center[:][:, 0:2]
+        xs, ys = centroids[:, 0], centroids[:, 1]
+        x_range = xs.min(), xs.max()
+        y_range = ys.min(), ys.max()
+        centers, params, angles = self.get_random_ellipsis(x_range, y_range)
 
-    def compute_vugs(self):
-        pass
+        print('Computing vugs')
+        faces_per_ellipsis = self.compute_vugs(
+            centers, angles, params, centroids)
+        print('Computing fractures')
+        self.compute_fractures(faces_per_ellipsis, centers)
+        print('Done!')
 
-    def compute_fracture(self):
-        pass
+    def compute_vugs(self, centers, angles, params, centroids):
+        faces_per_ellipsis = []
+        for center, param, angle in zip(centers, params, angles):
+            R = self.get_rotation_matrix(angle)
+            X = (centroids - center).dot(R.T)
+            faces_in_vug = (X / param)**2
+            faces_in_vug = faces_in_vug.sum(axis=1)
+            # Recuperar range dos volumes que estão no vug e salvar na lista faces_per_ellipsis
+            faces_per_ellipsis.append(
+                self.mesh.core.all_faces[faces_in_vug < 1])
+            self.mesh.vug[faces_in_vug < 1] = 1
+
+        return faces_per_ellipsis
+
+    def compute_fractures(self, faces_per_ellipsis, centers):
+        selected_pairs = []
+        num_possible_pairs = comb(self.num_ellipsis, 2)
+        found = True
+        for i in range(self.num_fractures):
+            # Find a pair of ellipsis that are not overlapped and are
+            # not already connected by a fracture.
+            count = 0
+            while True:
+                count += 1
+                e1, e2 = self.random_rng.choice(
+                    np.arange(self.num_ellipsis), size=2, replace=False)
+                if (e1, e2) not in selected_pairs and \
+                        rng.intersect(faces_per_ellipsis[e1], faces_per_ellipsis[e2]).empty():
+                    selected_pairs.extend([(e1, e2), (e2, e1)])
+                    break
+                if count > num_possible_pairs:
+                    found = False
+                    break
+            
+            if not found:
+                break
+        
+            # Calculating the rectangle's parameters.
+            L = np.linalg.norm(centers[e1] - centers[e2])   # Length
+            h = 10 / L  # Height
+
+            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
+            self.check_intersections(h, L, centers[e1], centers[e2])
+
+    def get_random_ellipsis(self, x_range, y_range):
+        random_centers = np.zeros((self.num_ellipsis, 2))
+
+        random_centers[:, 0] = self.random_rng.uniform(
+            low=x_range[0], high=x_range[1], size=self.num_ellipsis)
+        random_centers[:, 1] = self.random_rng.uniform(
+            low=y_range[0], high=y_range[1], size=self.num_ellipsis)
+
+        random_params = self.random_rng.uniform(low=self.ellipsis_params_range[0],
+                                           high=self.ellipsis_params_range[1],
+                                           size=(self.num_ellipsis, 2))
+        random_angles = self.random_rng.uniform(
+            low=0.0, high=2*np.pi, size=self.num_ellipsis)
+
+        return random_centers, random_params, random_angles
+
+    def check_intersections(self, h, L, c1, c2):
+        vertices_coords = self.mesh.nodes.coords[:][:, 0:2]
+        edges_endpoints = self.mesh.edges.connectivities[:]
+        num_edges_endpoints = edges_endpoints.shape[0]
+        edges_endpoints_coords = self.mesh.nodes.coords[edges_endpoints.ravel()][:, 0:2].reshape(
+            (num_edges_endpoints, 2, 2))
+
+        # We'll first check whether an edge intersects the line segment between
+        # the ellipsis' centers.
+        u = edges_endpoints_coords[:, 1, :] - edges_endpoints_coords[:, 0, :]
+        v = c2 - c1
+        w = edges_endpoints_coords[:, 0, :] - c1
+
+        uv_perp_prod = np.cross(u, v)
+        wv_perp_prod = np.cross(w, v)
+        uw_perp_prod = np.cross(u, w)
+
+        maybe_intersect = np.where(uv_perp_prod != 0)[0]
+        s1 = - wv_perp_prod[maybe_intersect] / uv_perp_prod[maybe_intersect]
+        t1 = uw_perp_prod[maybe_intersect] / uv_perp_prod[maybe_intersect]
+
+        intersecting_edges = maybe_intersect[(s1 >= 0) & (s1 <= 1) & (t1 >= 0) & (t1 <= 1)]
+        faces_in_fracture_from_edges = self.mesh.edges.bridge_adjacencies(
+            intersecting_edges, "edges", "faces").ravel()
+
+        # We now check which vertices are inside the fracture's bounding
+        # rectangle.
+        r = vertices_coords - c1
+        norm_v = np.linalg.norm(v)
+        d = np.cross(r, v) / norm_v
+        l = np.dot(r, v) / norm_v
+        vertices_in_fracture = self.mesh.nodes.all[(d >= 0) & (d <= h) & (l >= 0) & (l <= L)]
+        faces_in_fracture_from_nodes = np.concatenate(self.mesh.nodes.bridge_adjacencies(
+            vertices_in_fracture, "edges", "faces")).ravel()
+        
+        faces_in_fracture = np.intersect1d(np.unique(faces_in_fracture_from_edges), 
+            np.unique(faces_in_fracture_from_nodes))
+        faces_in_fracture_vug_value = self.mesh.vug[faces_in_fracture].flatten()
+        filtered_faces_in_fracture = faces_in_fracture[faces_in_fracture_vug_value != 1]
+        self.mesh.vug[filtered_faces_in_fracture] = 2
+        
+
+    def get_rotation_matrix(self, angle):
+        cos_theta = np.cos(angle)
+        sin_theta = np.sin(angle)
+
+        R = np.array((cos_theta, sin_theta,
+                     - sin_theta, cos_theta)).reshape(2, 2)
+
+        return R
+
+    def write_file(self, path):
+        vugs_meshset = self.mesh.core.mb.create_meshset()
+        self.mesh.core.mb.add_entities(
+            vugs_meshset, self.mesh.core.all_faces)
+        self.mesh.core.mb.write_file(path, [vugs_meshset])
 
 
 class DFNMeshGenerator3D(DFNMeshGenerator):
