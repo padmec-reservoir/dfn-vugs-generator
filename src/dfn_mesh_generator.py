@@ -29,20 +29,24 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
 
     def __init__(self, mesh_file, ellipsis_params_range, num_ellipsis, num_fractures):
         """
-        Constructor method.
-
-        Inputs
+        Parameters
         ------
-        mesh_file (String): A string containing the path to the input mesh file.
+        mesh_file : str
+            A string containing the path to the input mesh file.
+        ellipsis_params_range : iterable
+            An iterable containing the maximum and the minimum value for the ellipsis parameters.
+        num_ellipsis : int
+            The number of ellipsis to create.
+        num_fractures : int
+            Number of fractures to create.
 
-        ellipsis_params_range (iterable of size 2): A iterable containing the maximum and the
-        minimum value for the ellipsis parameters.
-
-        num_ellipsis (int): the number of ellipsis to create.
-
-        num_fractures (int): number of fractures to create.
-
+        Raises
+        ------
+        ValueError
+            If the number of fractures is greater than the number of possible
+            pairs of ellipsis.
         """
+
         self.mesh = FineScaleMesh(mesh_file, dim=2)
         self.ellipsis_params_range = ellipsis_params_range
         self.num_ellipsis = num_ellipsis
@@ -53,6 +57,10 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
         self.random_rng = np.random.default_rng()
 
     def run(self):
+        """
+        Main method. Generates a mesh containing fractures and vugs.
+        """
+
         centroids = self.mesh.faces.center[:][:, 0:2]
         xs, ys = centroids[:, 0], centroids[:, 1]
         x_range = xs.min(), xs.max()
@@ -67,6 +75,33 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
         print('Done!')
 
     def compute_vugs(self, centers, angles, params, centroids):
+        """
+        Compute the volumes inside the ellipsis given by centers, angles and params.
+
+        Parameters
+        ------
+        centers : numpy.array
+            Array containing the cartesian coordinates of
+            each ellipsoid center.
+
+        angles : numpy.array
+            Array containing the values (in radians) of the
+            three rotation angles with respect to the cartesian axis.
+
+        params : numpy.array
+            Array containing the parameters of each ellipsoid, i.e,
+            the size of the axis.
+
+        centroids : numpy.array
+            The centroids of the volumes compouding the mesh.
+
+        Returns
+        ------
+        vols_per_ellipsoid : list
+            A list of Pymoab's ranges describing the volumes
+            inside each ellipsoid.
+        """
+
         faces_per_ellipsis = []
         for center, param, angle in zip(centers, params, angles):
             R = self.get_rotation_matrix(angle)
@@ -81,6 +116,28 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
         return faces_per_ellipsis
 
     def compute_fractures(self, faces_per_ellipsis, centers):
+        """
+        Generates random fractures, i.e, rectangles connecting two vugs, 
+        and computes the volumes inside them. If a volumes is inside a 
+        fracture, then the property "fracture" from the mesh data 
+        structure is set to 1.
+
+        Parameters
+        ----------
+        faces_per_ellipsis : list 
+            A list of Pymoab's ranges describing the volumes
+            inside each ellipsoid.
+
+        centers : numpy.array 
+            Array containing the cartesian coordinates of
+            each ellipsis' center.
+
+        Returns
+        -------
+        None
+
+        """
+
         selected_pairs = []
         num_possible_pairs = comb(self.num_ellipsis, 2)
         found = True
@@ -127,6 +184,29 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
         return random_centers, random_params, random_angles
 
     def check_intersections(self, h, L, c1, c2):
+        """
+        Check which volumes are inside the fracture.
+
+        Parameters
+        ----------
+        h : float
+            Rectangle's height.
+
+        L : float
+            Rectangle's length.
+
+        c1 : numpy.array
+            Left end of the rectangle's axis.
+
+        c2 : numpy.array
+            Right end of the rectangle's axis.
+
+        Returns
+        -------
+        None
+
+        """
+
         vertices_coords = self.mesh.nodes.coords[:][:, 0:2]
         edges_endpoints = self.mesh.edges.connectivities[:]
         num_edges_endpoints = edges_endpoints.shape[0]
@@ -171,6 +251,21 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
         self.mesh.vug[filtered_faces_in_fracture] = 2
 
     def get_rotation_matrix(self, angle):
+        """
+        Calculates the 2D rotation matrix for the given angle.
+
+        Parameters
+        ----------
+        angle : numpy.array
+            The three rotation angles in radians.
+
+        Returns
+        -------
+        R : numpy.array
+            The rotation matrix.
+
+        """
+
         cos_theta = np.cos(angle)
         sin_theta = np.sin(angle)
 
@@ -180,6 +275,20 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
         return R
 
     def write_file(self, path):
+        """
+        Writes the resulting mesh to a file.
+
+        Parameters
+        ----------
+        path : str
+            A string containing the file path.
+
+        Returns
+        -------
+        None
+
+        """
+
         vugs_meshset = self.mesh.core.mb.create_meshset()
         self.mesh.core.mb.add_entities(
             vugs_meshset, self.mesh.core.all_faces)
@@ -195,14 +304,23 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         """
         Constructor method.
 
-        Inputs
+        Parameters
+        ----------
+        mesh_file : str
+            A string containing the path to the input mesh file.
+
+        ellipsis_params_range : iterable
+            An iterable of size 2 containing the maximum and the
+            minimum value for the ellipsoids parameters.
+
+        num_ellipsoids : int
+            The number of ellipsoids to create.
+
+        Raises
         ------
-        mesh_file (String): A string containing the path to the input mesh file.
-
-        ellipsis_params_range (iterable of size 2): A iterable containing the maximum and the
-        minimum value for the ellipsoids parameters.
-
-        num_ellipsoids (int): the number of ellipsoids to create.
+        ValueError
+            If the number of fractures is greater than the number of possible
+            pairs of ellipsoids.
 
         """
         self.mesh = FineScaleMesh(mesh_file)
@@ -217,15 +335,6 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         """
         Main method. Creates random sized and rotated ellipsoids and
         assigns the volumes inside the vugs.
-
-        Inputs
-        ------
-        None
-
-        Output
-        ------
-        None
-
         """
         centroids = self.mesh.volumes.center[:]
         xs, ys, zs = centroids[:, 0], centroids[:, 1], centroids[:, 2]
@@ -249,23 +358,28 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         ellipsoids. If a volumes is inside a vug, the property "vug" from
         the mesh data structure is set to 1.
 
-        Inputs
+        Parameters
+        ----------
+        centers : numpy.array
+            Array containing the cartesian coordinates of
+            each ellipsoid center.
+
+        angles : numpy.array
+            Array containing the values (in radians) of the
+            three rotation angles with respect to the cartesian axis.
+
+        params : numpy.array
+            Array containing the parameters of each ellipsoid, i.e,
+            the size of the axis.
+
+        centroids : numpy.array
+            The centroids of the volumes compouding the mesh.
+
+        Returns
         ------
-        centers (numpy array): Array containing the cartesian coordinates of
-        each ellipsoid center.
-
-        angles (numpy array): Array containing the values (in radians) of the
-        three rotation angles with respect to the cartesian axis.
-
-        params (numpy array): Array containing the parameters of each ellipsoid, i.e,
-        the size of the axis.
-
-        centroids (numpy array): The centroids of the volumes compouding the mesh.
-
-        Output
-        ------
-        vols_per_ellipsoid (list): A list of Pymoab's ranges describing the volumes
-        inside each ellipsoid.
+        vols_per_ellipsoid : list
+            A list of Pymoab's ranges describing the volumes
+            inside each ellipsoid.
 
         """
         vols_per_ellipsoid = []
@@ -288,23 +402,28 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         fracture, then the property "fracture" from the mesh data 
         structure is set to 1.
 
-        Inputs
-        ------
-        vols_per_ellipsoid (list): A list of Pymoab's ranges describing the volumes
-        inside each ellipsoid.
+        Parameters
+        ----------
+        vols_per_ellipsoid : list
+            A list of Pymoab's ranges describing the volumes
+            inside each ellipsoid.
 
-        centers (numpy array): Array containing the cartesian coordinates of
-        each ellipsoid center.
+        centers : numpy.array
+            Array containing the cartesian coordinates of
+            each ellipsoid center.
 
-        angles (numpy array): Array containing the values (in radians) of the
-        three rotation angles with respect to the cartesian axis.
+        angles : numpy.array
+            Array containing the values (in radians) of the
+            three rotation angles with respect to the cartesian axis.
 
-        params (numpy array): Array containing the parameters of each ellipsoid, i.e,
-        the size of the axis.
+        params : numpy.array
+            Array containing the parameters of each ellipsoid, i.e,
+            the size of the axis.
 
-        centroids (numpy array): The centroids of the volumes compouding the mesh.
+        centroids : numpy.array
+            The centroids of the volumes compouding the mesh.
 
-        Output
+        Returns
         ------
         None
 
@@ -332,17 +451,21 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         """
         Check which volumes are inside the fracture.
 
-        Inputs
-        ------
-        R (float): Cylinder's radius
+        Parameters
+        ----------
+        R : float
+            Cylinder's radius
 
-        L (float): Cylinder's length
+        L : float
+            Cylinder's length
 
-        c1 (numpy array): Left end of the cylinder's axis.
+        c1 : numpy.array
+            Left end of the cylinder's axis.
 
-        c2 (numpy array): Right end of the cylinder's axis.
+        c2 : numpy.array
+            Right end of the cylinder's axis.
 
-        Output
+        Returns
         ------
         None
 
@@ -417,13 +540,14 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
     def write_file(self, path="results/vugs.vtk"):
         """
-        Writes the resultant mesh into a file. Default path is 'results/vugs.vtk'.
+        Writes the resulting mesh into a file. Default path is 'results/vugs.vtk'.
 
-        Inputs
-        ------
-        path (String): A string containing the output file name.
+        Parameters
+        ----------
+        path : str
+            A string containing the file path.
 
-        Outputs
+        Returns
         -------
         None
 
@@ -438,27 +562,30 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         Generates random points as the ellipsoids centers as the axis sizes 
         and random rotation angles with respect to the cartesian coordinates (x,y,z).
 
-        Inputs
-        ------
-        x_range (iterable of size 2): A iterable containing the maximum and minimum 
-        values of the x coordinate.
+        Parameters
+        ----------
+        x_range : iterable
+            An iterable containing the maximum and minimum 
+            values of the x coordinate.
 
-        y_range (iterable of size 2): A iterable containing the maximum and minimum 
-        values of the y coordinate.
+        y_range : iterable
+            An iterable containing the maximum and minimum 
+            values of the y coordinate.
 
-        z_range (iterable of size 2): A iterable containing the maximum and minimum 
-        values of the z coordinate.
+        z_range : iterable
+            An iterable containing the maximum and minimum 
+            values of the z coordinate.
 
-        Outputs
+        Returns
         -------
-        random_centers (num_ellipsoids x 3 numpy array): The generated center 
-        points for the ellipsoids.
+        random_centers : numpy.array
+            The generated center points for the ellipsoids.
 
-        random_params (num_ellipsoids x 3 numpy array): The parameters a.k.a 
-        the size of the three axis of the ellipsoids.
+        random_params : numpy.array
+            The parameters a.k.a the size of the three axis of the ellipsoids.
 
-        random_angles (num_ellipsoids x 3 numpy array): The rotation angles 
-        for each ellipsoid.
+        random_angles : numpy.array
+            The rotation angles for each ellipsoid.
 
         """
         random_rng = np.random.default_rng()
@@ -480,16 +607,17 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
     def get_rotation_matrix(self, angle):
         """
-        Calculates the rotation matrix for the given angle. Such matrix is the result of 
-        three rotations: first with respect to x, then y, then z.
+        Calculates the 3D rotation matrix for the given angle.
 
-        Inputs
-        ------
-        angle (3 x 1 numpy array): The three rotation angles in radians.
+        Parameters
+        ----------
+        angle : numpy.array
+            The three rotation angles in radians.
 
-        Outputs
+        Returns
         -------
-        R (3 x 3 numpy array): The rotation matrix.
+        R : numpy.array
+            The rotation matrix.
 
         """
         cos_ang = np.cos(angle)
