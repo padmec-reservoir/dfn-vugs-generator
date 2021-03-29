@@ -99,10 +99,10 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
                 if count > num_possible_pairs:
                     found = False
                     break
-            
+
             if not found:
                 break
-        
+
             # Calculating the rectangle's parameters.
             L = np.linalg.norm(centers[e1] - centers[e2])   # Length
             h = 10 / L  # Height
@@ -119,8 +119,8 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
             low=y_range[0], high=y_range[1], size=self.num_ellipsis)
 
         random_params = self.random_rng.uniform(low=self.ellipsis_params_range[0],
-                                           high=self.ellipsis_params_range[1],
-                                           size=(self.num_ellipsis, 2))
+                                                high=self.ellipsis_params_range[1],
+                                                size=(self.num_ellipsis, 2))
         random_angles = self.random_rng.uniform(
             low=0.0, high=2*np.pi, size=self.num_ellipsis)
 
@@ -147,7 +147,8 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
         s1 = - wv_perp_prod[maybe_intersect] / uv_perp_prod[maybe_intersect]
         t1 = uw_perp_prod[maybe_intersect] / uv_perp_prod[maybe_intersect]
 
-        intersecting_edges = maybe_intersect[(s1 >= 0) & (s1 <= 1) & (t1 >= 0) & (t1 <= 1)]
+        intersecting_edges = maybe_intersect[(
+            s1 >= 0) & (s1 <= 1) & (t1 >= 0) & (t1 <= 1)]
         faces_in_fracture_from_edges = self.mesh.edges.bridge_adjacencies(
             intersecting_edges, "edges", "faces").ravel()
 
@@ -157,16 +158,17 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
         norm_v = np.linalg.norm(v)
         d = np.cross(r, v) / norm_v
         l = np.dot(r, v) / norm_v
-        vertices_in_fracture = self.mesh.nodes.all[(d >= 0) & (d <= h) & (l >= 0) & (l <= L)]
+        vertices_in_fracture = self.mesh.nodes.all[(
+            d >= 0) & (d <= h) & (l >= 0) & (l <= L)]
         faces_in_fracture_from_nodes = np.concatenate(self.mesh.nodes.bridge_adjacencies(
             vertices_in_fracture, "edges", "faces")).ravel()
-        
-        faces_in_fracture = np.intersect1d(np.unique(faces_in_fracture_from_edges), 
-            np.unique(faces_in_fracture_from_nodes))
-        faces_in_fracture_vug_value = self.mesh.vug[faces_in_fracture].flatten()
+
+        faces_in_fracture = np.intersect1d(np.unique(faces_in_fracture_from_edges),
+                                           np.unique(faces_in_fracture_from_nodes))
+        faces_in_fracture_vug_value = self.mesh.vug[faces_in_fracture].flatten(
+        )
         filtered_faces_in_fracture = faces_in_fracture[faces_in_fracture_vug_value != 1]
         self.mesh.vug[filtered_faces_in_fracture] = 2
-        
 
     def get_rotation_matrix(self, angle):
         cos_theta = np.cos(angle)
