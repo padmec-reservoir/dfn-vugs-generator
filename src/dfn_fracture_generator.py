@@ -8,14 +8,17 @@ class FractureMesh(object):
     A data structure for representation of a 1D fracture mesh.
     """
 
-    def __init__(self, endpoints):
+    def __init__(self, endpoints, fid):
         """
         Parameters
         ------
         endpoints: numpy array
             An array containing the endpoints of the line segment
             representing the fracture.
+        fid: int
+            An integer ID for the fracture.
         """
+        self.id = fid
         self.endpoints = endpoints
         self.nodes = SortedList(key=lambda arr: tuple(arr))
 
@@ -69,7 +72,7 @@ class FractureGenerator2D(object):
         self.line_segments[:, :, 1] = self.random_rng.uniform(
             high=self.bbox_dimensions[1], low=0.0, size=(self.num_fractures, 2))
         self.fractures_mesh = [FractureMesh(
-            endpoints) for endpoints in self.line_segments]
+            endpoints, fracture_id) for endpoints, fracture_id in zip(self.line_segments, range(self.num_fractures))]
 
         for fracture_mesh in self.fractures_mesh:
             fracture_mesh.set_mesh_nodes(self.num_nodes)
