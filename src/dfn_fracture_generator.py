@@ -3,7 +3,7 @@ from sortedcontainers import SortedList
 import matplotlib.pyplot as plt
 
 
-class FractureMesh(object):
+class Fracture(object):
     """
     A data structure for representation of a 1D fracture mesh.
     """
@@ -60,7 +60,7 @@ class FractureGenerator2D(object):
         self.bbox_dimensions = bounding_box_dimensions
         self.random_rng = np.random.default_rng()
         self.line_segments = np.zeros((self.num_fractures, 2, 2))
-        self.fractures_mesh = None
+        self.fractures = None
         self.num_nodes = num_nodes
 
     def generate_fractures(self):
@@ -81,10 +81,11 @@ class FractureGenerator2D(object):
         pass
 
     def plot_fractures(self):
-        for fracture in self.fractures_mesh:
+        for fracture in self.fractures:
             nodes_coords = np.array(list(fracture.nodes.irange()))
-            plt.plot(nodes_coords[:, 0],
-                     nodes_coords[:, 1], "ro-", linewidth=3)
+            plt.plot(fracture.endpoints[:, 0], fracture.endpoints[:, 1], "ro-", linewidth=3)
+            if len(nodes_coords) > 0:
+                plt.plot(nodes_coords[:, 0], nodes_coords[:, 1], "ro")
         plt.show()
 
     def export_fractures_to_file(self, path):
