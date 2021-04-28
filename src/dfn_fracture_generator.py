@@ -23,12 +23,11 @@ class Fracture(object):
         self.nodes = SortedList(key=lambda arr: tuple(arr))
 
         if (endpoints[0, 1] > endpoints[1, 1]) or \
-            (endpoints[0, 1] == endpoints[1, 1] and endpoints[0, 0] <= endpoints[1, 0]):
-            self.upper_endpoint = endpoints[0, :]
-            self.lower_endpoint = endpoints[1, :]
+                (endpoints[0, 1] == endpoints[1, 1] and endpoints[0, 0] <= endpoints[1, 0]):
+            endpoints[[0, 1]] = endpoints[[1, 0]]
+            self.endpoints = endpoints
         else:
-            self.upper_endpoint = endpoints[1, :]
-            self.lower_endpoint = endpoints[0, :]
+            self.endpoints = endpoints
 
     def set_mesh_nodes(self, min_dist):
         """
@@ -40,10 +39,10 @@ class Fracture(object):
             Minimal distance between two discrete points.
         """
         N = int(np.linalg.norm(
-            self.upper_endpoint - self.lower_endpoint) / min_dist)
+            self.endpoints[0, :] - self.endpoints[1, :]) / min_dist)
         convex_param_range = np.linspace(0, 1, N + 2).reshape((N + 2, 1))
         nodes_coords = (1 - convex_param_range) * \
-            self.upper_endpoint + convex_param_range * self.lower_endpoint
+            self.endpoints[0, :] + convex_param_range * self.endpoints[1, :]
 
         for node_coord in nodes_coords:
             self.nodes.add(node_coord)
@@ -68,7 +67,7 @@ class FractureGenerator2D(object):
         """
         self.num_fractures = num_fractures
         self.bbox_dimensions = bounding_box_dimensions
-        self.random_rng = np.random.default_rng(42)
+        self.random_rng = np.random.default_rng()
         self.line_segments = np.zeros((self.num_fractures, 2, 2))
         self.fractures = None
         self.min_node_dist = min_node_dist
@@ -116,11 +115,11 @@ class FractureGenerator2D(object):
         for fracture in self.fractures:
             nodes_coords = np.array(list(fracture.nodes.irange()))
             if len(nodes_coords) > 0:
-                plt.plot(nodes_coords[:, 0], nodes_coords[:, 1], "ro-", linewidth=3)
+                plt.plot(nodes_coords[:, 0],
+                         nodes_coords[:, 1], "ro-", linewidth=3)
             else:
-                plt.plot([fracture.upper_endpoint[0],
-                     fracture.lower_endpoint[0]], [fracture.upper_endpoint[1],
-                     fracture.lower_endpoint[1]], "ro-", linewidth=3)
+                plt.plot(
+                    fracture.endpoints[:, 0], fracture.endpoints[:, 1], "ro-", linewidth=3)
         plt.show()
 
     def export_fractures_to_file(self, path):
