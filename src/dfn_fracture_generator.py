@@ -20,8 +20,15 @@ class Fracture(object):
             An integer ID for the fracture.
         """
         self.id = fid
-        self.endpoints = endpoints
         self.nodes = SortedList(key=lambda arr: tuple(arr))
+
+        if (endpoints[0, 1] > endpoints[1, 1]) or \
+            (endpoints[0, 1] == endpoints[1, 1] and endpoints[0, 0] <= endpoints[1, 0]):
+            self.upper_endpoint = endpoints[0, :]
+            self.lower_endpoint = endpoints[1, :]
+        else:
+            self.upper_endpoint = endpoints[1, :]
+            self.lower_endpoint = endpoints[0, :]
 
     def set_mesh_nodes(self, min_dist):
         """
@@ -32,10 +39,11 @@ class Fracture(object):
         min_dist: float
             Minimal distance between two discrete points.
         """
-        N = int(np.linalg.norm(self.endpoints[0] - self.endpoints[1]) / min_dist)
+        N = int(np.linalg.norm(
+            self.upper_endpoint - self.lower_endpoint) / min_dist)
         convex_param_range = np.linspace(0, 1, N + 2).reshape((N + 2, 1))
         nodes_coords = (1 - convex_param_range) * \
-            self.endpoints[0, :] + convex_param_range*self.endpoints[1, :]
+            self.upper_endpoint + convex_param_range * self.lower_endpoint
 
         for node_coord in nodes_coords:
             self.nodes.add(node_coord)
@@ -83,7 +91,7 @@ class FractureGenerator2D(object):
         Check fractures for intersections and add points to the
         fracture mesh.
         """
-        # TODO: Usar estratégia line sweep para reduzir 
+        # TODO: Usar estratégia line sweep para reduzir
         # o número de interseções.
 
         for f1 in self.fractures:
@@ -107,7 +115,8 @@ class FractureGenerator2D(object):
     def plot_fractures(self):
         for fracture in self.fractures:
             nodes_coords = np.array(list(fracture.nodes.irange()))
-            plt.plot(fracture.endpoints[:, 0], fracture.endpoints[:, 1], "ro-", linewidth=3)
+            plt.plot(fracture.endpoints[:, 0],
+                     fracture.endpoints[:, 1], "ro-", linewidth=3)
             if len(nodes_coords) > 0:
                 plt.plot(nodes_coords[:, 0], nodes_coords[:, 1], "ro")
         plt.show()
