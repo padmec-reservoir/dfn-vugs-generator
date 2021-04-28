@@ -1,6 +1,7 @@
 import numpy as np
 from sortedcontainers import SortedList
 import matplotlib.pyplot as plt
+from .utils import segments_intersect
 
 
 class Fracture(object):
@@ -71,14 +72,30 @@ class FractureGenerator2D(object):
             high=self.bbox_dimensions[0], low=0.0, size=(self.num_fractures, 2))
         self.line_segments[:, :, 1] = self.random_rng.uniform(
             high=self.bbox_dimensions[1], low=0.0, size=(self.num_fractures, 2))
-        self.fractures_mesh = [FractureMesh(
+        self.fractures = [Fracture(
             endpoints, fracture_id) for endpoints, fracture_id in zip(self.line_segments, range(self.num_fractures))]
 
-        for fracture_mesh in self.fractures_mesh:
-            fracture_mesh.set_mesh_nodes(self.num_nodes)
-
     def find_intersections(self):
-        pass
+        # TODO: Usar estratégia line sweep para reduzir 
+        # o número de interseções.
+
+        for f1 in self.fractures:
+            for f2 in self.fractures:
+                if f1.id != f2.id and segments_intersect(f1.endpoints, f2.endpoints):
+                    # Vector directions for the segments.
+                    u = f1.endpoints[1] - f1.endpoints[0]
+                    v = f2.endpoints[1] - f2.endpoints[0]
+                    w = f2.endpoints[0] - f1.endpoints[0]
+
+                    # Parameters of the intersection.
+                    s = np.cross(w, v) / np.cross(v, u)
+
+                    # Intersection point.
+                    I = f1.endpoints[0] - s*u
+
+                    # Insert point into fracture's mesh.
+                    f1.nodes.add(I)
+                    f2.nodes.add(I)
 
     def plot_fractures(self):
         for fracture in self.fractures:
