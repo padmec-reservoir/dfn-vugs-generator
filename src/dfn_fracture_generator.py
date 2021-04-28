@@ -68,7 +68,7 @@ class FractureGenerator2D(object):
         """
         self.num_fractures = num_fractures
         self.bbox_dimensions = bounding_box_dimensions
-        self.random_rng = np.random.default_rng()
+        self.random_rng = np.random.default_rng(42)
         self.line_segments = np.zeros((self.num_fractures, 2, 2))
         self.fractures = None
         self.min_node_dist = min_node_dist
@@ -115,10 +115,12 @@ class FractureGenerator2D(object):
     def plot_fractures(self):
         for fracture in self.fractures:
             nodes_coords = np.array(list(fracture.nodes.irange()))
-            plt.plot(fracture.endpoints[:, 0],
-                     fracture.endpoints[:, 1], "ro-", linewidth=3)
             if len(nodes_coords) > 0:
-                plt.plot(nodes_coords[:, 0], nodes_coords[:, 1], "ro")
+                plt.plot(nodes_coords[:, 0], nodes_coords[:, 1], "ro-", linewidth=3)
+            else:
+                plt.plot([fracture.upper_endpoint[0],
+                     fracture.lower_endpoint[0]], [fracture.upper_endpoint[1],
+                     fracture.lower_endpoint[1]], "ro-", linewidth=3)
         plt.show()
 
     def export_fractures_to_file(self, path):
