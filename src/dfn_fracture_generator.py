@@ -55,8 +55,8 @@ class FractureGenerator2D(object):
             Number of fractures to be generated.
         bounding_box_dimensions: tuple
             Dimensions of the bounding box across the x and y axis.
-        num_nodes: int
-            Number of elements in the fracture mesh.
+        min_node_dist: float
+            The minimal distance between the fractures' nodes.
         """
         self.num_fractures = num_fractures
         self.bbox_dimensions = bounding_box_dimensions
@@ -79,6 +79,10 @@ class FractureGenerator2D(object):
             fracture.set_mesh_nodes(self.min_node_dist)
 
     def find_intersections(self):
+        """
+        Check fractures for intersections and add points to the
+        fracture mesh.
+        """
         # TODO: Usar estratégia line sweep para reduzir 
         # o número de interseções.
 

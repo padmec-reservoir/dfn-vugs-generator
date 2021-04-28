@@ -2,6 +2,17 @@ import numpy as np
 
 
 def segments_intersect(s1, s2):
+    """
+    Check if two line segments intersect.
+
+    Parameters
+    ----------
+    s1: numpy.array
+        A 2D line segment represented by its two endpoints.
+    s2: numpy.array
+        Another 2D line segment.
+    """
+
     tol = 1e-8
     d1 = direction(s2[0], s2[1], s1[0])
     d2 = direction(s2[0], s2[1], s1[1])
@@ -25,10 +36,32 @@ def segments_intersect(s1, s2):
 
 
 def direction(pi, pj, pk):
+    """
+    Find if a point is clokwise or counterclockwise to a line segment.
+
+    Parameters
+    ----------
+    pi: numpy.array
+        An endpoint of the line segment.
+    pj: numpy.array
+        Another endpoint of the line segment.
+    pk: numpy.array
+        The point to be checked for direction.
+    """
     return np.cross(pk - pi, pj - pi)
 
 
 def point_on_segment(s, p):
+    """
+    Check if a point lies on a segment.
+
+    Parameters
+    ----------
+    s: numpy.array
+        A 2D line segment represented by its two endpoints.
+    p: numpy.array
+        The point that will be checked if in segment.
+    """
     is_on_segment = (p[0] >= s[:, 0].min()) & (p[0] <= s[:, 0].max()) & (
         p[1] >= s[:, 1].min()) & (p[1] <= s[:, 1].max())
     return is_on_segment
