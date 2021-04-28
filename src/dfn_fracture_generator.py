@@ -23,15 +23,16 @@ class Fracture(object):
         self.endpoints = endpoints
         self.nodes = SortedList(key=lambda arr: tuple(arr))
 
-    def set_mesh_nodes(self, N):
+    def set_mesh_nodes(self, min_dist):
         """
         Set the discrete points of the mesh.
 
         Parameters
         ----------
-        N: int
-            Number of nodes to be generated.
+        min_dist: float
+            Minimal distance between two discrete points.
         """
+        N = int(np.linalg.norm(self.endpoints[0] - self.endpoints[1]) / min_dist)
         convex_param_range = np.linspace(0, 1, N + 2).reshape((N + 2, 1))
         nodes_coords = (1 - convex_param_range) * \
             self.endpoints[0, :] + convex_param_range*self.endpoints[1, :]
@@ -46,7 +47,7 @@ class FractureGenerator2D(object):
     represented by line segments.
     """
 
-    def __init__(self, num_fractures, bounding_box_dimensions, num_nodes):
+    def __init__(self, num_fractures, bounding_box_dimensions, min_node_dist):
         """
         Parameters
         ------
@@ -62,7 +63,7 @@ class FractureGenerator2D(object):
         self.random_rng = np.random.default_rng()
         self.line_segments = np.zeros((self.num_fractures, 2, 2))
         self.fractures = None
-        self.num_nodes = num_nodes
+        self.min_node_dist = min_node_dist
 
     def generate_fractures(self):
         """
@@ -74,6 +75,8 @@ class FractureGenerator2D(object):
             high=self.bbox_dimensions[1], low=0.0, size=(self.num_fractures, 2))
         self.fractures = [Fracture(
             endpoints, fracture_id) for endpoints, fracture_id in zip(self.line_segments, range(self.num_fractures))]
+        for fracture in self.fractures:
+            fracture.set_mesh_nodes(self.min_node_dist)
 
     def find_intersections(self):
         # TODO: Usar estratégia line sweep para reduzir 
