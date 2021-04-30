@@ -1,6 +1,97 @@
 import numpy as np
 
 
+# ---------------------------
+# DATA STRUCTURES FOR THE LINE SWEEP ALGORITHM
+# ---------------------------
+class LineSegmentTreeNode(object):
+    def __init__(self, line_id, endpoints, parent=None, left_child=None, right_child=None):
+        self.line_id = line_id
+        self.endpoints = endpoints
+        self.parent = parent
+        self.left_child = left_child
+        self.right_child = right_child
+
+    def __str__(self):
+        return "ID: {}\nEndpoints: {}".format(self.line_id, self.endpoints)
+
+
+class LineSweepStatusTree(object):
+    def __init__(self):
+        self.root = None
+
+    def insert(self, new_node):
+        y = None
+        x = self.root
+        leftest_endpoint_index = new_node.endpoints[:, 0].argmin()
+        leftest_endpoint = new_node.endpoints[leftest_endpoint_index]
+
+        while x is not None:
+            y = x
+            if direction(x.endpoints[0], x.endpoints[1], leftest_endpoint) > 0:
+                x = x.left_child
+            else:
+                x = x.right_child
+
+        new_node.parent = y
+        if y is None:
+            self.root = new_node
+        elif direction(y.endpoints[0], y.endpoints[1], leftest_endpoint) > 0:
+            y.left_child = new_node
+        else:
+            y.right_child = new_node
+
+    def remove(self, node):
+        if node.left_child is None:
+            self.transplant(node, node.right_child)
+        elif node.right_child is None:
+            self.transplant(node, node.left_child)
+        else:
+            y = self.minimum(node.right_child)
+            if y.parent.line_id != node.line_id:
+                self.transplant(y, y.right_child)
+                y.right_child = node.right_child
+                y.right_child.parent = y
+            self.transplant(node, y)
+            y.left_child = node.left_child
+            y.left_child.parent = y
+
+    def transplant(self, u, v):
+        # u -> sub-árvore a ser substituída
+        # v -> sub-árvore substituta
+        if u.parent is None:
+            self.root = v
+        elif u.line_id == u.parent.left_child:
+            u.parent.left_child = v
+        else:
+            u.parent.right_child = v
+
+        if v is not None:
+            v.parent = u.parent
+
+    def minimum(self, node):
+        while node.left_child is not None:
+            node = node.left_child
+        return node
+
+    def find(self, node):
+        curr_node = self.root
+        leftest_endpoint_index = node.endpoints[:, 0].argmin()
+        leftest_endpoint = node.endpoints[leftest_endpoint_index]
+
+        while curr_node is not None and node.line_id != curr_node.line_id:
+            if direction(curr_node.endpoints[0], curr_node.endpoints[1], leftest_endpoint) > 0:
+                curr_node = curr_node.left_child
+            else:
+                curr_node = curr_node.right_child
+
+        return curr_node
+
+# ---------------------------
+# GEOMETRY ROUTINES
+# ---------------------------
+
+
 def segments_intersect(s1, s2):
     """
     Check if two line segments intersect.
