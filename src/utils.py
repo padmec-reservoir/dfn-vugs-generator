@@ -74,6 +74,11 @@ class LineSweepStatusTree(object):
             node = node.left_child
         return node
 
+    def maximum(self, node):
+        while node.right_child is not None:
+            node = node.right_child
+        return node
+
     def find(self, node):
         curr_node = self.root
         leftest_endpoint_index = node.endpoints[:, 0].argmin()
@@ -87,6 +92,17 @@ class LineSweepStatusTree(object):
 
         return curr_node
 
+    def successor(self, node):
+        if node.right_child is not None:
+            return self.minimum(node.right_child)
+        
+        y = node.parent
+        while y is not None and node.line_id == y.right_child.line_id:
+            node = y
+            y = y.parent
+        
+        return y
+    
 # ---------------------------
 # GEOMETRY ROUTINES
 # ---------------------------
