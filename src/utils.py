@@ -103,6 +103,17 @@ class LineSweepStatusTree(object):
         
         return y
     
+    def predecessor(self, node):
+        if node.left_child is not None:
+            return self.maximum(node.left_child)
+        
+        y = node.parent
+        while y is not None and node.line_id == y.left_child.line_id:
+            node = y
+            y = y.parent
+        
+        return y
+
 # ---------------------------
 # GEOMETRY ROUTINES
 # ---------------------------
