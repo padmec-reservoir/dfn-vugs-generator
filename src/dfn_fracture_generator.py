@@ -1,6 +1,7 @@
 import numpy as np
-from sortedcontainers import SortedList
 import matplotlib.pyplot as plt
+from scipy.io import savemat
+from sortedcontainers import SortedList
 from .utils import segments_intersect
 
 
@@ -86,9 +87,6 @@ class FractureGenerator2D(object):
         Check fractures for intersections and add points to the
         fracture mesh.
         """
-        # TODO: Usar estratégia line sweep para reduzir 
-        # o número de interseções.
-
         for f1 in self.fractures:
             for f2 in self.fractures:
                 if f1.id != f2.id and \
@@ -116,7 +114,8 @@ class FractureGenerator2D(object):
     def plot_fractures(self):
         for fracture in self.fractures:
             nodes_coords = np.array(list(fracture.nodes.irange()))
-            plt.plot(fracture.endpoints[:, 0], fracture.endpoints[:, 1], "ro-", linewidth=3)
+            plt.plot(fracture.endpoints[:, 0],
+                     fracture.endpoints[:, 1], "ro-", linewidth=2)
             if len(nodes_coords) > 0:
                 plt.plot(nodes_coords[:, 0], nodes_coords[:, 1], "ro")
         plt.show()
@@ -125,6 +124,15 @@ class FractureGenerator2D(object):
         """
         Write the fractures matrix to a text file.
         """
-        reshaped_fractures = self.line_segments.reshape(
-            (self.num_fractures, 4))
-        np.savetxt(path, reshaped_fractures)
+        num_intersecting_pairs = len(self.intersecting_pairs)
+
+        fracture_points_array = np.array(
+            [np.array(list(f.nodes.irange())) for f in self.fractures], dtype=object)
+        intersection_points_array = np.array(
+            self.intersection_points).reshape((num_intersecting_pairs, 2))
+        intersecting_pairs_array = np.array(
+            self.intersecting_pairs).reshape((num_intersecting_pairs, 2)) + 1
+
+        mdict = {"fractures": fracture_points_array, "intersections": intersection_points_array,
+                 "intersecting_pairs": intersecting_pairs_array}
+        savemat(path, mdict)
