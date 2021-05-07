@@ -32,7 +32,8 @@ class Fracture(object):
         min_dist: float
             Minimal distance between two discrete points.
         """
-        N = int(np.linalg.norm(self.endpoints[0] - self.endpoints[1]) / min_dist)
+        N = int(np.linalg.norm(
+            self.endpoints[0] - self.endpoints[1]) / min_dist)
         convex_param_range = np.linspace(0, 1, N + 2).reshape((N + 2, 1))
         nodes_coords = (1 - convex_param_range) * \
             self.endpoints[0, :] + convex_param_range*self.endpoints[1, :]
@@ -63,6 +64,8 @@ class FractureGenerator2D(object):
         self.random_rng = np.random.default_rng()
         self.line_segments = np.zeros((self.num_fractures, 2, 2))
         self.fractures = None
+        self.intersection_points = []
+        self.intersecting_pairs = []
         self.min_node_dist = min_node_dist
 
     def generate_fractures(self):
@@ -88,7 +91,10 @@ class FractureGenerator2D(object):
 
         for f1 in self.fractures:
             for f2 in self.fractures:
-                if f1.id != f2.id and segments_intersect(f1.endpoints, f2.endpoints):
+                if f1.id != f2.id and \
+                    (f1.id, f2.id) not in self.intersecting_pairs and \
+                    (f2.id, f1.id) not in self.intersecting_pairs and \
+                        segments_intersect(f1.endpoints, f2.endpoints):
                     # Vector directions for the segments.
                     u = f1.endpoints[1] - f1.endpoints[0]
                     v = f2.endpoints[1] - f2.endpoints[0]
@@ -103,6 +109,9 @@ class FractureGenerator2D(object):
                     # Insert point into fracture's mesh.
                     f1.nodes.add(I)
                     f2.nodes.add(I)
+
+                    self.intersection_points.append(I)
+                    self.intersecting_pairs.append((f1.id, f2.id))
 
     def plot_fractures(self):
         for fracture in self.fractures:
