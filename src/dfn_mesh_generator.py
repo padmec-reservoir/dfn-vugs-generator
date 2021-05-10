@@ -18,7 +18,7 @@ class DFNMeshGenerator(object):
     def compute_vugs(self):
         raise NotImplementedError()
 
-    def compute_fracture(self):
+    def compute_fractures(self):
         raise NotImplementedError()
 
 
