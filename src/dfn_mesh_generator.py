@@ -300,7 +300,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
     A 3D mesh generator for fracured and vuggy reservoirs.
     """
 
-    def __init__(self, mesh_file, ellipsis_params_range, num_ellipsoids, num_fractures):
+    def __init__(self, mesh_file, ellipsis_params_range,
+                 num_ellipsoids, num_fractures, fracture_shape="cylinder"):
         """
         Constructor method.
 
@@ -316,6 +317,12 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         num_ellipsoids : int
             The number of ellipsoids to create.
 
+        num_fractures : int
+            The number of fractures to create.
+
+        fracture_shape: str
+            The shape of fractures to be generated.
+
         Raises
         ------
         ValueError
@@ -330,6 +337,9 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             raise ValueError(
                 "The number of fractures must be inferior to the number of possible pairs of ellipsoids.")
         self.num_fractures = num_fractures
+        if fracture_shape not in ("cylinder", "box", "ellipsoid"):
+            raise ValueError("Invalid shape for fractures.")
+        self.fracture_shape = fracture_shape
 
     def run(self):
         """
@@ -396,6 +406,17 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         return vols_per_ellipsoid
 
     def compute_fractures(self, vols_per_ellipsoid, centers, angles, params, centroids):
+        if self.fracture_shape == "cylinder":
+            self.compute_fractures_as_cylinders(
+                vols_per_ellipsoid, centers, angles, params, centroids)
+        elif self.fracture_shape == "box":
+            self.compute_fractures_as_boxes(
+                vols_per_ellipsoid, centers, angles, params, centroids)
+        elif self.fracture_shape == "ellipsoid":
+            self.compute_fractures_as_ellipsoids(
+                vols_per_ellipsoid, centers, angles, params, centroids)
+
+    def compute_fractures_as_cylinders(self, vols_per_ellipsoid, centers, angles, params, centroids):
         """
         Generates random fractures, i.e, cylinders connecting two vugs, 
         and computes the volumes inside them. If a volumes is inside a 
@@ -445,9 +466,15 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             r = 10 / L  # Radius
 
             print("Creating fracture {} of {}".format(i+1, self.num_fractures))
-            self.check_intersections(r, L, centers[e1], centers[e2])
+            self.check_intersections_for_cylinders(r, L, centers[e1], centers[e2])
 
-    def check_intersections(self, R, L, c1, c2):
+    def compute_fractures_as_boxes(self, vols_per_ellipsoid, centers, angles, params, centroids):
+        pass
+    
+    def compute_fractures_as_ellipsoids(self, vols_per_ellipsoid, centers, angles, params, centroids):
+        pass
+
+    def check_intersections_for_cylinders(self, R, L, c1, c2):
         """
         Check which volumes are inside the fracture.
 
@@ -538,6 +565,12 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         non_vug_volumes = unique_volumes[unique_volumes_vug_values == 0]
         self.mesh.vug[non_vug_volumes] = 2
 
+    def check_intersections_for_boxes(self):
+        pass
+    
+    def check_intersections_for_ellipsoids(self):
+        pass
+    
     def write_file(self, path="results/vugs.vtk"):
         """
         Writes the resulting mesh into a file. Default path is 'results/vugs.vtk'.
