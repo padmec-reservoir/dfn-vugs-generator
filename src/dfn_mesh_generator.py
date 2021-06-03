@@ -340,6 +340,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         if fracture_shape not in ("cylinder", "box", "ellipsoid"):
             raise ValueError("Invalid shape for fractures.")
         self.fracture_shape = fracture_shape
+        self.random_rng = np.random.default_rng(42)
 
     def run(self):
         """
@@ -449,13 +450,12 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         None
 
         """
-        random_rng = np.random.default_rng()
         selected_pairs = []
         for i in range(self.num_fractures):
             # Find a pair of ellipsoids that are not overlapped and are
             # not already connected by a fracture.
             while True:
-                e1, e2 = random_rng.choice(
+                e1, e2 = self.random_rng.choice(
                     np.arange(self.num_ellipsoids), size=2, replace=False)
                 if (e1, e2) not in selected_pairs and \
                         rng.intersect(vols_per_ellipsoid[e1], vols_per_ellipsoid[e2]).empty():
@@ -621,19 +621,18 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             The rotation angles for each ellipsoid.
 
         """
-        random_rng = np.random.default_rng()
         random_centers = np.zeros((self.num_ellipsoids, 3))
 
-        random_centers[:, 0] = random_rng.uniform(
+        random_centers[:, 0] = self.random_rng.uniform(
             low=x_range[0], high=x_range[1], size=self.num_ellipsoids)
-        random_centers[:, 1] = random_rng.uniform(
+        random_centers[:, 1] = self.random_rng.uniform(
             low=y_range[0], high=y_range[1], size=self.num_ellipsoids)
-        random_centers[:, 2] = random_rng.uniform(
+        random_centers[:, 2] = self.random_rng.uniform(
             low=z_range[0], high=z_range[1], size=self.num_ellipsoids)
-        random_params = random_rng.uniform(low=self.ellipsis_params_range[0],
+        random_params = self.random_rng.uniform(low=self.ellipsis_params_range[0],
                                            high=self.ellipsis_params_range[1],
                                            size=(self.num_ellipsoids, 3))
-        random_angles = random_rng.uniform(
+        random_angles = self.random_rng.uniform(
             low=0.0, high=2*np.pi, size=(self.num_ellipsoids, 3))
 
         return random_centers, random_params, random_angles
