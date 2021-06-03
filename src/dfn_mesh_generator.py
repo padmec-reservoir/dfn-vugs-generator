@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.special import comb
 from pymoab import rng
+from math import atan2
 from preprocessor.meshHandle.finescaleMesh import FineScaleMesh
 
 
@@ -455,11 +456,50 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             self.check_intersections_for_cylinders(
                 r, L, centers[e1], centers[e2])
 
-    def compute_fractures_as_boxes(self, vols_per_ellipsoid, centers, angles, params, centroids):
-        pass
-    
-    def compute_fractures_as_ellipsoids(self, vols_per_ellipsoid, centers, angles, params, centroids):
-        pass
+    def compute_fractures_as_boxes(self, vols_per_ellipsoid, centers):
+        selected_pairs = []
+        for i in range(self.num_fractures):
+            # Find a pair of ellipsoids that are not overlapped and are
+            # not already connected by a fracture.
+            while True:
+                e1, e2 = self.random_rng.choice(
+                    np.arange(self.num_ellipsoids), size=2, replace=False)
+                if (e1, e2) not in selected_pairs and \
+                        rng.intersect(vols_per_ellipsoid[e1], vols_per_ellipsoid[e2]).empty():
+                    selected_pairs.extend([(e1, e2), (e2, e1)])
+                    break
+
+            d = np.linalg.norm(centers[e1] - centers[e2])
+            l = 1 / d
+            h = d / 5
+
+            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
+            self.check_intersections_for_boxes(
+                d, l, h, centers[e1], centers[e2])
+
+    def compute_fractures_as_ellipsoids(self, vols_per_ellipsoid, centers):
+        selected_pairs = []
+        for i in range(self.num_fractures):
+            # Find a pair of ellipsoids that are not overlapped and are
+            # not already connected by a fracture.
+            while True:
+                e1, e2 = self.random_rng.choice(
+                    np.arange(self.num_ellipsoids), size=2, replace=False)
+                if (e1, e2) not in selected_pairs and \
+                        rng.intersect(vols_per_ellipsoid[e1], vols_per_ellipsoid[e2]).empty():
+                    selected_pairs.extend([(e1, e2), (e2, e1)])
+                    break
+
+            d = np.linalg.norm(centers[e1] - centers[e2])
+            fracture_center = (centers[e1] + centers[e2]) / 2
+            fracture_params = np.array((d/2, d / 20, d / 100))
+            rotation_angles = np.array((atan2(fracture_center[1], fracture_center[0]), atan2(
+                fracture_center[2], fracture_center[0]), atan2(fracture_center[2], fracture_center[1])))
+            rotation_matrix = self.get_rotation_matrix(rotation_angles)
+
+            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
+            self.check_intersections_for_ellipsoids(
+                fracture_center, fracture_params, rotation_matrix, centers[e1], centers[e2])
 
     def check_intersections_for_cylinders(self, R, L, c1, c2):
         """
@@ -552,12 +592,21 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         non_vug_volumes = unique_volumes[unique_volumes_vug_values == 0]
         self.mesh.vug[non_vug_volumes] = 2
 
-    def check_intersections_for_boxes(self):
+    def check_intersections_for_boxes(self, d, l, h, c1, c2):
         pass
-    
-    def check_intersections_for_ellipsoids(self):
-        pass
-    
+
+    def check_intersections_for_ellipsoids(self, center, params, R, c1, c2):
+        vertices = self.mesh.nodes.coords[:]
+        X = (vertices - center).dot(R.T)
+        vertices_in_ellipsoid = ((X / params)**2).sum(axis=1)
+        vertices_handles = self.mesh.nodes.all[vertices_in_ellipsoid < 1]
+        vols_in_fracture = np.concatenate(self.mesh.nodes.bridge_adjacencies(
+            vertices_handles, "edges", "volumes")).ravel()
+        unique_vols_in_fracture = np.unique(vols_in_fracture)
+        unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
+        non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
+        self.mesh.vug[non_vug_volumes] = 2
+
     def write_file(self, path="results/vugs.vtk"):
         """
         Writes the resulting mesh into a file. Default path is 'results/vugs.vtk'.
