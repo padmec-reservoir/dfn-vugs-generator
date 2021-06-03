@@ -408,16 +408,13 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
     def compute_fractures(self, vols_per_ellipsoid, centers, angles, params, centroids):
         if self.fracture_shape == "cylinder":
-            self.compute_fractures_as_cylinders(
-                vols_per_ellipsoid, centers, angles, params, centroids)
+            self.compute_fractures_as_cylinders(vols_per_ellipsoid, centers)
         elif self.fracture_shape == "box":
-            self.compute_fractures_as_boxes(
-                vols_per_ellipsoid, centers, angles, params, centroids)
+            self.compute_fractures_as_boxes(vols_per_ellipsoid, centers)
         elif self.fracture_shape == "ellipsoid":
-            self.compute_fractures_as_ellipsoids(
-                vols_per_ellipsoid, centers, angles, params, centroids)
+            self.compute_fractures_as_ellipsoids(vols_per_ellipsoid, centers)
 
-    def compute_fractures_as_cylinders(self, vols_per_ellipsoid, centers, angles, params, centroids):
+    def compute_fractures_as_cylinders(self, vols_per_ellipsoid, centers):
         """
         Generates random fractures, i.e, cylinders connecting two vugs, 
         and computes the volumes inside them. If a volumes is inside a 
@@ -433,17 +430,6 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         centers : numpy.array
             Array containing the cartesian coordinates of
             each ellipsoid center.
-
-        angles : numpy.array
-            Array containing the values (in radians) of the
-            three rotation angles with respect to the cartesian axis.
-
-        params : numpy.array
-            Array containing the parameters of each ellipsoid, i.e,
-            the size of the axis.
-
-        centroids : numpy.array
-            The centroids of the volumes compouding the mesh.
 
         Returns
         ------
@@ -466,7 +452,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             r = 10 / L  # Radius
 
             print("Creating fracture {} of {}".format(i+1, self.num_fractures))
-            self.check_intersections_for_cylinders(r, L, centers[e1], centers[e2])
+            self.check_intersections_for_cylinders(
+                r, L, centers[e1], centers[e2])
 
     def compute_fractures_as_boxes(self, vols_per_ellipsoid, centers, angles, params, centroids):
         pass
