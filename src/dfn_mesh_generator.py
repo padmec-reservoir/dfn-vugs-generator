@@ -691,13 +691,15 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         cos_ang = np.cos(angle)
         sin_ang = np.sin(angle)
         R = np.array([
-            cos_ang[1]*cos_ang[2], -cos_ang[1]*sin_ang[2], sin_ang[1],
-            sin_ang[0]*sin_ang[1]*cos_ang[2] + cos_ang[0]*sin_ang[2],
-            cos_ang[0]*cos_ang[2] - sin_ang[0]*sin_ang[1]*sin_ang[2],
-            -sin_ang[0]*sin_ang[1], sin_ang[0]*sin_ang[2] -
-            cos_ang[0]*sin_ang[1]*sin_ang[2],
-            cos_ang[0]*sin_ang[1]*sin_ang[2] + sin_ang[0] *
-            cos_ang[2], cos_ang[0]*cos_ang[1]
+            cos_ang[1] * cos_ang[2],
+            cos_ang[2] * sin_ang[1] * sin_ang[0] - sin_ang[2] * cos_ang[0],
+            cos_ang[2] * sin_ang[1] * cos_ang[0] + sin_ang[2] * sin_ang[0],
+            sin_ang[2] * cos_ang[1],
+            sin_ang[2] * sin_ang[1] * sin_ang[0] + cos_ang[2] * cos_ang[0],
+            sin_ang[2] * sin_ang[1] * cos_ang[0] - cos_ang[2] * sin_ang[0],
+            - sin_ang[1],
+            cos_ang[1] * sin_ang[0],
+            cos_ang[1] * cos_ang[0]
         ]).reshape((3, 3))
 
         return R
