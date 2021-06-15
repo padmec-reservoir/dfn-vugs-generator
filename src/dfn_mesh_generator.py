@@ -341,7 +341,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         if fracture_shape not in ("cylinder", "box", "ellipsoid"):
             raise ValueError("Invalid shape for fractures.")
         self.fracture_shape = fracture_shape
-        self.random_rng = np.random.default_rng(42)
+        self.random_rng = np.random.default_rng()
 
     def run(self):
         """
