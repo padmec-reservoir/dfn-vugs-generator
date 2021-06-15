@@ -407,6 +407,25 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         return vols_per_ellipsoid
 
     def compute_fractures(self, vols_per_ellipsoid, centers):
+        """
+        Generate fractures according to the instance parameters 
+        `fracture_shape` and `num_fractures`.
+
+        Parameters
+        ----------
+        vols_per_ellipsoid : list
+            A list of Pymoab's ranges describing the volumes
+            inside each ellipsoid.
+
+        centers : numpy.array
+            Array containing the cartesian coordinates of
+            each vug ellipsoid center.
+
+        Returns
+        ------
+        None
+
+        """
         if self.fracture_shape == "cylinder":
             self.compute_fractures_as_cylinders(vols_per_ellipsoid, centers)
         elif self.fracture_shape == "box":
@@ -416,9 +435,50 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
     def compute_fractures_as_cylinders(self, vols_per_ellipsoid, centers):
         """
-        Generates random fractures, i.e, cylinders connecting two vugs, 
+        Generates random fractures shaped as cylinders connecting two vugs, 
         and computes the volumes inside them. If a volumes is inside a 
-        fracture, then the property "fracture" from the mesh data 
+        fracture, then the property `fracture` of the mesh data 
+        structure is set to 1.
+
+        Parameters
+        ----------
+        vols_per_ellipsoid : list
+            A list of Pymoab's ranges describing the volumes
+            inside each ellipsoid.
+
+        centers : numpy.array
+            Array containing the cartesian coordinates of
+            each vug ellipsoid center.
+
+        Returns
+        ------
+        None
+
+        """
+        selected_pairs = []
+        for i in range(self.num_fractures):
+            # Find a pair of ellipsoids that are not overlapped and are
+            # not already connected by a fracture.
+            while True:
+                e1, e2 = self.random_rng.choice(
+                    np.arange(self.num_ellipsoids), size=2, replace=False)
+                if (e1, e2) not in selected_pairs and \
+                        rng.intersect(vols_per_ellipsoid[e1], vols_per_ellipsoid[e2]).empty():
+                    selected_pairs.extend([(e1, e2), (e2, e1)])
+                    break
+            # Calculating the cylinder's parameters.
+            L = np.linalg.norm(centers[e1] - centers[e2])   # Length
+            r = 10 / L  # Radius
+
+            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
+            self.check_intersections_for_cylinders(
+                r, L, centers[e1], centers[e2])
+
+    def compute_fractures_as_boxes(self, vols_per_ellipsoid, centers):
+        """
+        Generates random fractures shaped as boxes connecting two vugs, 
+        and computes the volumes inside them. If a volumes is inside a 
+        fracture, then the property `fracture` of the mesh data 
         structure is set to 1.
 
         Parameters
@@ -447,26 +507,6 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                         rng.intersect(vols_per_ellipsoid[e1], vols_per_ellipsoid[e2]).empty():
                     selected_pairs.extend([(e1, e2), (e2, e1)])
                     break
-            # Calculating the cylinder's parameters.
-            L = np.linalg.norm(centers[e1] - centers[e2])   # Length
-            r = 10 / L  # Radius
-
-            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
-            self.check_intersections_for_cylinders(
-                r, L, centers[e1], centers[e2])
-
-    def compute_fractures_as_boxes(self, vols_per_ellipsoid, centers):
-        selected_pairs = []
-        for i in range(self.num_fractures):
-            # Find a pair of ellipsoids that are not overlapped and are
-            # not already connected by a fracture.
-            while True:
-                e1, e2 = self.random_rng.choice(
-                    np.arange(self.num_ellipsoids), size=2, replace=False)
-                if (e1, e2) not in selected_pairs and \
-                        rng.intersect(vols_per_ellipsoid[e1], vols_per_ellipsoid[e2]).empty():
-                    selected_pairs.extend([(e1, e2), (e2, e1)])
-                    break
 
             d = np.linalg.norm(centers[e1] - centers[e2])
             l = 1 / d
@@ -477,6 +517,27 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                 d, l, h, centers[e1], centers[e2])
 
     def compute_fractures_as_ellipsoids(self, vols_per_ellipsoid, centers):
+        """
+        Generates random fractures shaped as ellipsoids connecting two vugs, 
+        and computes the volumes inside them. If a volumes is inside a 
+        fracture, then the property `fracture` of the mesh data 
+        structure is set to 1.
+
+        Parameters
+        ----------
+        vols_per_ellipsoid : list
+            A list of Pymoab's ranges describing the volumes
+            inside each ellipsoid.
+
+        centers : numpy.array
+            Array containing the cartesian coordinates of
+            each ellipsoid center.
+
+        Returns
+        ------
+        None
+
+        """
         selected_pairs = []
         for i in range(self.num_fractures):
             # Find a pair of ellipsoids that are not overlapped and are
@@ -584,7 +645,33 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         non_vug_volumes = unique_volumes[unique_volumes_vug_values == 0]
         self.mesh.vug[non_vug_volumes] = 2
 
-    def check_intersections_for_boxes(self, d, l, h, c1, c2):
+    def check_intersections_for_boxes(self, c1, c2, d, l, h):
+        """
+        Check which volumes are inside the box shaped fracture.
+
+        Parameters
+        ----------
+
+        c1 : numpy.array
+            Left end of the cylinder's axis.
+
+        c2 : numpy.array
+            Right end of the cylinder's axis.
+
+        d: float
+            Depth of box.
+        
+        l: float
+            Length of box.
+        
+        h: float
+            Height of box.
+
+        Returns
+        ------
+        None
+
+        """
         pass
 
     def check_intersections_for_ellipsoids(self, c1, c2):
