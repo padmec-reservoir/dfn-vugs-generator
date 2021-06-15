@@ -360,8 +360,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         vols_per_ellipsoid = self.compute_vugs(
             centers, angles, params, centroids)
         print('Computing fractures')
-        self.compute_fractures(vols_per_ellipsoid, centers,
-                               angles, params, centroids)
+        self.compute_fractures(vols_per_ellipsoid, centers)
         print('Done!')
 
     def compute_vugs(self, centers, angles, params, centroids):
@@ -407,7 +406,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         return vols_per_ellipsoid
 
-    def compute_fractures(self, vols_per_ellipsoid, centers, angles, params, centroids):
+    def compute_fractures(self, vols_per_ellipsoid, centers):
         if self.fracture_shape == "cylinder":
             self.compute_fractures_as_cylinders(vols_per_ellipsoid, centers)
         elif self.fracture_shape == "box":
