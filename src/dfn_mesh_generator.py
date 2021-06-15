@@ -550,7 +550,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                     selected_pairs.extend([(e1, e2), (e2, e1)])
                     break
 
-            print("Creating fracture {} of {}".format(i + 1, self.num_fractures))
+            print("Creating fracture {} of {}".format(
+                i + 1, self.num_fractures))
 
             self.check_intersections_for_ellipsoids(centers[e1], centers[e2])
 
@@ -660,10 +661,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         d: float
             Depth of box.
-        
+
         l: float
             Length of box.
-        
+
         h: float
             Height of box.
 
@@ -798,8 +799,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         random_centers[:, 2] = self.random_rng.uniform(
             low=z_range[0], high=z_range[1], size=self.num_ellipsoids)
         random_params = self.random_rng.uniform(low=self.ellipsis_params_range[0],
-                                           high=self.ellipsis_params_range[1],
-                                           size=(self.num_ellipsoids, 3))
+                                                high=self.ellipsis_params_range[1],
+                                                size=(self.num_ellipsoids, 3))
         random_angles = self.random_rng.uniform(
             low=0.0, high=2*np.pi, size=(self.num_ellipsoids, 3))
 
