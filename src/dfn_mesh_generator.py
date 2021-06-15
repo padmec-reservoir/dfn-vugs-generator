@@ -1,8 +1,8 @@
 import numpy as np
 from scipy.special import comb
 from pymoab import rng
-from math import atan2
 from preprocessor.meshHandle.finescaleMesh import FineScaleMesh
+from .utils import angle_between
 
 
 class DFNMeshGenerator(object):
@@ -490,16 +490,9 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                     selected_pairs.extend([(e1, e2), (e2, e1)])
                     break
 
-            d = np.linalg.norm(centers[e1] - centers[e2])
-            fracture_center = (centers[e1] + centers[e2]) / 2
-            fracture_params = np.array((d/2, d / 20, d / 100))
-            rotation_angles = np.array((atan2(fracture_center[1], fracture_center[0]), atan2(
-                fracture_center[2], fracture_center[0]), atan2(fracture_center[2], fracture_center[1])))
-            rotation_matrix = self.get_rotation_matrix(rotation_angles)
+            print("Creating fracture {} of {}".format(i + 1, self.num_fractures))
 
-            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
-            self.check_intersections_for_ellipsoids(
-                fracture_center, fracture_params, rotation_matrix, centers[e1], centers[e2])
+            self.check_intersections_for_ellipsoids(centers[e1], centers[e2])
 
     def check_intersections_for_cylinders(self, R, L, c1, c2):
         """
@@ -595,17 +588,70 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
     def check_intersections_for_boxes(self, d, l, h, c1, c2):
         pass
 
-    def check_intersections_for_ellipsoids(self, center, params, R, c1, c2):
+    def check_intersections_for_ellipsoids(self, c1, c2):
+        """
+        Check which volumes are inside the ellipsoid shaped fracture.
+
+        Parameters
+        ----------
+
+        c1 : numpy.array
+            Left end of the cylinder's axis.
+
+        c2 : numpy.array
+            Right end of the cylinder's axis.
+
+        Returns
+        ------
+        None
+
+        """
+        # Ellipsoid's parameters
+        centers_diff = c1 - c2
+        d = np.linalg.norm(centers_diff)
+        center = (c1 + c2) / 2
+        params = np.array((d / 2, d / 20, d / 100))
+
+        # Defining orientation vectors.
+        u = np.array([params[0], 0.0, 0.0])
+        v = c1 - center
+
+        # Rotate u onto v's projection onto the xy plane.
+        u_proj_xy = u[[0, 1]]
+        v_proj_xy = v[[0, 1]]
+        gamma = angle_between(u_proj_xy, v_proj_xy)
+        R_z = self.get_rotation_matrix(np.array([0.0, 0.0, gamma]))
+        u_rot_z = u.dot(R_z.T)
+
+        # Rotate u onto v's projection onto the x'z plane.
+        u_proj_xz = u_rot_z[[0, 2]]
+        v_proj_xz = v[[0, 2]]
+        beta = angle_between(u_proj_xz, v_proj_xz)
+
+        z_orientation = np.cross(u_proj_xy, v_proj_xy)
+        y_orientation = np.cross(u_proj_xz, v_proj_xz)
+
+        # Fix sense of rotation angles.
+        if y_orientation < 0:
+            beta *= -1
+        if z_orientation > 0:
+            gamma *= -1
+
+        rotation_angles = np.array([0.0, beta, gamma])
+        R = self.get_rotation_matrix(rotation_angles)
+
         vertices = self.mesh.nodes.coords[:]
         X = (vertices - center).dot(R.T)
         vertices_in_ellipsoid = ((X / params)**2).sum(axis=1)
         vertices_handles = self.mesh.nodes.all[vertices_in_ellipsoid < 1]
-        vols_in_fracture = np.concatenate(self.mesh.nodes.bridge_adjacencies(
-            vertices_handles, "edges", "volumes")).ravel()
-        unique_vols_in_fracture = np.unique(vols_in_fracture)
-        unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
-        non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
-        self.mesh.vug[non_vug_volumes] = 2
+
+        if len(vertices_handles) > 0:
+            vols_in_fracture = np.concatenate(self.mesh.nodes.bridge_adjacencies(
+                vertices_handles, "edges", "volumes")).ravel()
+            unique_vols_in_fracture = np.unique(vols_in_fracture)
+            unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
+            non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
+            self.mesh.vug[non_vug_volumes] = 2
 
     def write_file(self, path="results/vugs.vtk"):
         """
