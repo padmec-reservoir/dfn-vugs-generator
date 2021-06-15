@@ -1,4 +1,23 @@
 import numpy as np
+from math import acos
+
+
+def angle_between(u, v):
+    """
+    Compute the angle between two vectors
+
+    Parameters
+    ----------
+    u: numpy.array
+        A vector.
+    v: numpy.array
+        Another vector.
+    """
+    norm_u = np.linalg.norm(u)
+    norm_v = np.linalg.norm(v)
+    u_dot_v = u.dot(v)
+    angle = acos(u_dot_v / (norm_u * norm_v))
+    return angle
 
 
 def segments_intersect(s1, s2):
