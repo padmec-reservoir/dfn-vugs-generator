@@ -538,6 +538,13 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         None
 
         """
+        # Compute minimal parameter size for ellipsoids.
+        all_edges_endpoints = self.mesh.edges.connectivities[:]
+        N = len(all_edges_endpoints)
+        all_edges_coords = self.mesh.nodes.coords[all_edges_endpoints.flatten()].reshape((N, 2, 3))
+        edges_length = np.linalg.norm(all_edges_coords[:, 0, :] - all_edges_coords[:, 1, :], axis=1)
+        param_c = edges_length.min()
+
         selected_pairs = []
         for i in range(self.num_fractures):
             # Find a pair of ellipsoids that are not overlapped and are
@@ -553,7 +560,11 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             print("Creating fracture {} of {}".format(
                 i + 1, self.num_fractures))
 
-            self.check_intersections_for_ellipsoids(centers[e1], centers[e2])
+            c1, c2 = centers[e1], centers[e2]
+            d = np.linalg.norm(c1 - c2)
+            params = np.array((d / 2, d / 20, param_c))
+
+            self.check_intersections_for_ellipsoids(c1, c2, params)
 
     def check_intersections_for_cylinders(self, R, L, c1, c2):
         """
@@ -675,7 +686,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         """
         pass
 
-    def check_intersections_for_ellipsoids(self, c1, c2):
+    def check_intersections_for_ellipsoids(self, c1, c2, params):
         """
         Check which volumes are inside the ellipsoid shaped fracture.
 
@@ -694,10 +705,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         """
         # Ellipsoid's parameters
-        centers_diff = c1 - c2
-        d = np.linalg.norm(centers_diff)
         center = (c1 + c2) / 2
-        params = np.array((d / 2, d / 20, d / 100))
 
         # Defining orientation vectors.
         u = np.array([params[0], 0.0, 0.0])
