@@ -496,6 +496,13 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         None
 
         """
+        # Compute minimal parameter size for boxes.
+        all_edges_endpoints = self.mesh.edges.connectivities[:]
+        N = len(all_edges_endpoints)
+        all_edges_coords = self.mesh.nodes.coords[all_edges_endpoints.flatten()].reshape((N, 2, 3))
+        edges_length = np.linalg.norm(all_edges_coords[:, 0, :] - all_edges_coords[:, 1, :], axis=1)
+        param_c = edges_length.min()
+
         selected_pairs = []
         for i in range(self.num_fractures):
             # Find a pair of ellipsoids that are not overlapped and are
@@ -509,12 +516,12 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                     break
 
             d = np.linalg.norm(centers[e1] - centers[e2])
-            l = 1 / d
-            h = d / 5
+            l = d / 20
+            h = param_c
 
             print("Creating fracture {} of {}".format(i+1, self.num_fractures))
             self.check_intersections_for_boxes(
-                d, l, h, centers[e1], centers[e2])
+                centers[e1], centers[e2], d, l, h)
 
     def compute_fractures_as_ellipsoids(self, vols_per_ellipsoid, centers):
         """
@@ -684,7 +691,55 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         None
 
         """
-        pass
+        # Box center.
+        center = (c1 + c2) / 2
+
+        # Defining an orientation vector so we can compute rotations.
+        u = np.array([d / 2, 0.0, 0.0])
+        v = c1 - center
+
+        # Rotate u onto v's projection onto the xy plane.
+        u_proj_xy = u[[0, 1]]
+        v_proj_xy = v[[0, 1]]
+        gamma = angle_between(u_proj_xy, v_proj_xy)
+        R_z = self.get_rotation_matrix(np.array([0.0, 0.0, gamma]))
+        u_rot_z = u.dot(R_z.T)
+
+        # Rotate u onto v's projection onto the x'z plane.
+        u_proj_xz = u_rot_z[[0, 2]]
+        v_proj_xz = v[[0, 2]]
+        beta = angle_between(u_proj_xz, v_proj_xz)
+
+        z_orientation = np.cross(u_proj_xy, v_proj_xy)
+
+        if z_orientation < 0:
+            print("fix z 2")
+            gamma *= -1
+        
+        rotation_angles = np.array([0.0, beta, gamma])
+        R = self.get_rotation_matrix(rotation_angles)
+
+        # Compute the rotated axis.
+        rotated_ax = np.array([1.0, 0.0, 0.0]).dot(R.T)
+        rotated_ay = np.array([0.0, 1.0, 0.0]).dot(R.T)
+        rotated_az = np.array([0.0, 0.0, 1.0]).dot(R.T)
+
+        # Compute volumes inside the box (what's in the box!?).
+        vertices = self.mesh.nodes.coords[:]
+        X = vertices - center
+        vertices_in_x_range = np.abs(X.dot(rotated_ax)) <= (d / 2)
+        vertices_in_y_range = np.abs(X.dot(rotated_ay)) <= (l / 2)
+        vertices_in_z_range = np.abs(X.dot(rotated_az)) <= (h / 2)
+        vertices_handles = self.mesh.nodes.all[vertices_in_x_range & vertices_in_y_range & vertices_in_z_range]
+
+        if len(vertices_handles) > 0:
+            vols_in_fracture = np.concatenate(self.mesh.nodes.bridge_adjacencies(
+                vertices_handles, "edges", "volumes")).ravel()
+            unique_vols_in_fracture = np.unique(vols_in_fracture)
+            unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
+            non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
+            self.mesh.vug[non_vug_volumes] = 2
+
 
     def check_intersections_for_ellipsoids(self, c1, c2, params):
         """
