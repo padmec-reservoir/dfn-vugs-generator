@@ -713,18 +713,21 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         beta = angle_between(u_proj_xz, v_proj_xz)
 
         z_orientation = np.cross(u_proj_xy, v_proj_xy)
+        y_orientation = np.cross(u_proj_xz, v_proj_xz)
 
-        if z_orientation < 0:
-            print("fix z 2")
+        # Fix sense of rotation angles.
+        if y_orientation < 0:
+            beta *= -1
+        if z_orientation > 0:
             gamma *= -1
         
         rotation_angles = np.array([0.0, beta, gamma])
         R = self.get_rotation_matrix(rotation_angles)
 
         # Compute the rotated axis.
-        rotated_ax = np.array([1.0, 0.0, 0.0]).dot(R.T)
-        rotated_ay = np.array([0.0, 1.0, 0.0]).dot(R.T)
-        rotated_az = np.array([0.0, 0.0, 1.0]).dot(R.T)
+        rotated_ax = np.array([1.0, 0.0, 0.0]).dot(R)
+        rotated_ay = np.array([0.0, 1.0, 0.0]).dot(R)
+        rotated_az = np.array([0.0, 0.0, 1.0]).dot(R)
 
         # Compute volumes inside the box (what's in the box!?).
         vertices = self.mesh.nodes.coords[:]
