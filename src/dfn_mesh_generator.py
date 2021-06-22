@@ -615,12 +615,12 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         vertices_in_cylinder = self.mesh.nodes.all[(d <= R) & (
             proj_vertices >= 0) & (proj_vertices <= L)]
         if len(vertices_in_cylinder) > 0:
-        volumes_in_cylinder = self.mesh.nodes.bridge_adjacencies(vertices_in_cylinder,
-                                                                 "edges", "volumes").ravel()
-        volumes_in_cylinder = np.unique(volumes_in_cylinder)
-        volumes_vug_value = self.mesh.vug[volumes_in_cylinder].flatten()
-        non_vug_volumes = volumes_in_cylinder[volumes_vug_value == 0]
-        self.mesh.vug[non_vug_volumes] = 2
+            volumes_in_cylinder = self.mesh.nodes.bridge_adjacencies(vertices_in_cylinder,
+                                                                    "edges", "volumes").ravel()
+            volumes_in_cylinder = np.unique(volumes_in_cylinder)
+            volumes_vug_value = self.mesh.vug[volumes_in_cylinder].flatten()
+            non_vug_volumes = volumes_in_cylinder[volumes_vug_value == 0]
+            self.mesh.vug[non_vug_volumes] = 2
 
         faces = self.mesh.faces.all[:]
         nodes_from_faces = self.mesh.faces.connectivities(faces)
@@ -807,6 +807,59 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
             non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
             self.mesh.vug[non_vug_volumes] = 2
+        
+        # Check edge intersections. Here we compute the intersection between the
+        # line segments defined by the edges and the ellipsoid.
+        # See http://www.illusioncatalyst.com/notes_files/mathematics/line_nu_sphere_intersection.php
+        # for reference.
+        # T_inv = np.array([
+        #     1.0, 0.0, 0.0, -center[0],
+        #     0.0, 1.0, 0.0, -center[1],
+        #     0.0, 0.0, 1.0, -center[2],
+        #     0.0, 0.0, 0.0, 1.0
+        # ]).reshape((4, 4))
+        # S_inv = np.diag([1 / params[0], 1 / params[1], 1 / params[2], 1.0])
+        # R_inv = np.array([
+        #     R[0, 0], R[0, 1], R[0, 2], 0.0,
+        #     R[1, 0], R[1, 1], R[1, 2], 0.0,
+        #     R[2, 0], R[2, 1], R[2, 2], 0.0,
+        #     0.0, 0.0, 0.0, 1.0,
+        # ]).reshape((4, 4)).T
+        # M_inv = T_inv.dot(R_inv).dot(S_inv)
+
+        # # Compute the line segments vector parameters.
+        # edges_endpoints = self.mesh.edges.connectivities[:]
+        # N = len(edges_endpoints)
+        # edges_endpoints_coords = self.mesh.nodes.coords[edges_endpoints.flatten()]
+        # edges_endpoints_extended_coords = np.hstack((edges_endpoints_coords,
+        #     np.ones((2 * N, 1)))).reshape((N, 2, 4))
+        # L_0 = edges_endpoints_extended_coords[:, 0, :].dot(M_inv)
+        # w = L_0 - M_inv.dot(np.array([center[0], center[1], center[2], 1.0]))
+        # v = (edges_endpoints_extended_coords[:, 1, :] - edges_endpoints_extended_coords[:, 0, :]).dot(M_inv)
+
+        # # Compute the coefficients of the quadratic equation.
+        # a = np.einsum("ij,ij->i", v, v)
+        # b = 2 * np.einsum("ij,ij->i", v, w)
+        # c = np.einsum("ij,ij->i", w, w) - 1
+        # delta = b**2 - 4 * a * c
+
+        # # Find line segments intercepting ellipsoid.
+        # candidate_edges_indices = np.where(delta > 0)[0]
+        # delta_filtered = delta[candidate_edges_indices]
+        # a_filtered = a[candidate_edges_indices]
+        # b_filtered = b[candidate_edges_indices]
+
+        # t1 = (- b_filtered + np.sqrt(delta_filtered)) / (2 * a_filtered)
+        # t2 = (- b_filtered - np.sqrt(delta_filtered)) / (2 * a_filtered)
+        # intercepting_edges = candidate_edges_indices[((t1 >= 0) & (t1 <= 0)) | ((t2 >= 0) & (t2 <= 0))]
+
+        # if len(intercepting_edges) > 0:
+        #     vols_in_fracture = np.concatenate(self.mesh.edges.bridge_adjacencies(
+        #         intercepting_edges, "edges", "volumes")).ravel()
+        #     unique_vols_in_fracture = np.unique(vols_in_fracture)
+        #     unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
+        #     non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
+        #     self.mesh.vug[non_vug_volumes] = 2
 
     def write_file(self, path="results/vugs.vtk"):
         """
