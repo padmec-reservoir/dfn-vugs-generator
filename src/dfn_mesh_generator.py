@@ -501,7 +501,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         N = len(all_edges_endpoints)
         all_edges_coords = self.mesh.nodes.coords[all_edges_endpoints.flatten()].reshape((N, 2, 3))
         edges_length = np.linalg.norm(all_edges_coords[:, 0, :] - all_edges_coords[:, 1, :], axis=1)
-        param_c = edges_length.min()
+        min_height = edges_length.min()
+        min_length = edges_length.max()
 
         selected_pairs = []
         for i in range(self.num_fractures):
@@ -516,8 +517,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                     break
 
             d = np.linalg.norm(centers[e1] - centers[e2])
-            l = d / 20
-            h = param_c
+            l = min_length if min_length > d / 20 else d / 20
+            h = min_height
 
             print("Creating fracture {} of {}".format(i+1, self.num_fractures))
             self.check_intersections_for_boxes(
