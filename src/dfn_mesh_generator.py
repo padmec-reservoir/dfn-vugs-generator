@@ -614,6 +614,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         # Checking which vertices are inside the cylinder.
         vertices_in_cylinder = self.mesh.nodes.all[(d <= R) & (
             proj_vertices >= 0) & (proj_vertices <= L)]
+        if len(vertices_in_cylinder) > 0:
         volumes_in_cylinder = self.mesh.nodes.bridge_adjacencies(vertices_in_cylinder,
                                                                  "edges", "volumes").ravel()
         volumes_in_cylinder = np.unique(volumes_in_cylinder)
