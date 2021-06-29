@@ -622,49 +622,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             non_vug_volumes = volumes_in_cylinder[volumes_vug_value == 0]
             self.mesh.vug[non_vug_volumes] = 2
 
-        faces = self.mesh.faces.all[:]
-        nodes_from_faces = self.mesh.faces.connectivities(faces)
-        nodes_coords = np.array([self.mesh.nodes.coords[nodes]
-                                 for nodes in nodes_from_faces])
-
-        # Check if the cylinder's axis intercept any of the faces of a volume and
-        # compute the point of intersection.
-        normal = np.cross(nodes_coords[:, 1, :] - nodes_coords[:, 0, :],
-                          nodes_coords[:, 2, :] - nodes_coords[:, 0, :])
-        denom = normal.dot(c2 - c1)
-        num = np.einsum("ij,ij->i", normal, nodes_coords[:, 0, :] - c1)
-        non_zero_denom = denom[np.abs(denom) > 1e-6]
-        non_zero_num = num[np.abs(denom) > 1e-6]
-        r = non_zero_num / non_zero_denom
-        filtered_faces = faces[np.abs(denom) > 1e-6]
-        filtered_faces = filtered_faces[(r >= 0) & (r <= 1)]
-        filtered_nodes = nodes_coords[np.abs(denom) > 1e-6]
-        filtered_nodes = filtered_nodes[(r >= 0) & (r <= 1)]
-        r = r[(r >= 0) & (r <= 1)]
-        P = c1 + r[:, np.newaxis]*(c2 - c1)
-
-        angle_sum = np.zeros(filtered_nodes.shape[0])
-        n = filtered_nodes.shape[1]
-        for i in range(n):
-            p0, p1 = filtered_nodes[:, i, :], filtered_nodes[:, (i+1) % n, :]
-            a = p0 - P
-            b = p1 - P
-            norm_prod = np.linalg.norm(a, axis=1)*np.linalg.norm(b, axis=1)
-            # If the point of intersection is too close to a vertex, then
-            # take it as the vertex itself.
-            angle_sum[norm_prod <= 1e-6] = 2*np.pi
-            cos_theta = np.einsum("ij,ij->i", a, b) / norm_prod
-            theta = np.arccos(cos_theta)
-            angle_sum += theta
-        # If the sum of the angles around the intersection point is 2*pi, then
-        # the point is inside the polygon.
-        intersected_faces = filtered_faces[np.abs(2*np.pi - angle_sum) < 1e-6]
-        volumes_sharing_face = self.mesh.faces.bridge_adjacencies(
-            intersected_faces, "faces", "volumes")
-        unique_volumes = np.unique(volumes_sharing_face.ravel())
-        unique_volumes_vug_values = self.mesh.vug[unique_volumes].flatten()
-        non_vug_volumes = unique_volumes[unique_volumes_vug_values == 0]
-        self.mesh.vug[non_vug_volumes] = 2
+        self.check_intersections_along_axis(c1, c2)
 
     def check_intersections_for_boxes(self, c1, c2, d, l, h):
         """
@@ -744,7 +702,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
             non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
             self.mesh.vug[non_vug_volumes] = 2
-
+        
+        self.check_intersections_along_axis(c1, c2)
 
     def check_intersections_for_ellipsoids(self, c1, c2, params):
         """
@@ -807,6 +766,63 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
             non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
             self.mesh.vug[non_vug_volumes] = 2
+        
+        self.check_intersections_along_axis(c1, c2)
+
+    def check_intersections_along_axis(self, c1, c2):
+        # Check for intersection between the box's axis and the mesh faces.
+        faces = self.mesh.faces.all[:]
+        num_faces = len(faces)
+        faces_nodes_handles = self.mesh.faces.connectivities[:]
+        num_vertices_of_volume = faces_nodes_handles.shape[1]
+        faces_vertices = self.mesh.nodes.coords[faces_nodes_handles.flatten()].reshape(
+            (num_faces, num_vertices_of_volume, 3))
+
+        # Plane parameters of each face.
+        R_0 = faces_vertices[:, 0, :]
+        N = np.cross(faces_vertices[:, 1, :] - R_0, faces_vertices[:, 2, :] - R_0)
+
+        # Compute the parameters of the main axis line.
+        num = np.einsum("ij,ij->i", N, R_0 - c1)
+        denom = N.dot(c2 - c1)
+        
+        non_zero_denom = denom[np.abs(denom) > 1e-6]
+        non_zero_num = num[np.abs(denom) > 1e-6]
+        r = non_zero_num / non_zero_denom
+
+        # Check faces intersected by the axis' line.
+        filtered_faces = faces[np.abs(denom) > 1e-6]
+        filtered_faces = filtered_faces[(r >= 0) & (r <= 1)]
+        filtered_nodes = faces_vertices[np.abs(denom) > 1e-6]
+        filtered_nodes = filtered_nodes[(r >= 0) & (r <= 1)]
+
+        r = r[(r >= 0) & (r <= 1)]
+        P = c1 + r[:, np.newaxis]*(c2 - c1)
+
+        # Compute the intersection point between the face plane and the axis
+        # line and check if such point is in the face.
+        angle_sum = np.zeros(filtered_nodes.shape[0])
+        for i in range(num_vertices_of_volume):
+            p0, p1 = filtered_nodes[:, i, :], filtered_nodes[:, (i+1) % num_vertices_of_volume, :]
+            a = p0 - P
+            b = p1 - P
+            norm_prod = np.linalg.norm(a, axis=1)*np.linalg.norm(b, axis=1)
+            # If the point of intersection is too close to a vertex, then
+            # take it as the vertex itself.
+            angle_sum[norm_prod <= 1e-6] = 2*np.pi
+            cos_theta = np.einsum("ij,ij->i", a, b) / norm_prod
+            theta = np.arccos(cos_theta)
+            angle_sum += theta
+
+        # If the sum of the angles around the intersection point is 2*pi, then
+        # the point is inside the polygon.
+        intersected_faces = filtered_faces[np.abs(2*np.pi - angle_sum) < 1e-6]
+        volumes_sharing_face = self.mesh.faces.bridge_adjacencies(
+            intersected_faces, "faces", "volumes")
+        unique_volumes = np.unique(volumes_sharing_face.ravel())
+        unique_volumes_vug_values = self.mesh.vug[unique_volumes].flatten()
+        non_vug_volumes = unique_volumes[unique_volumes_vug_values == 0]
+        self.mesh.vug[non_vug_volumes] = 2
 
     def write_file(self, path="results/vugs.vtk"):
         """
