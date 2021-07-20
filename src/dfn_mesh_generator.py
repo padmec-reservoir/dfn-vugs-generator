@@ -617,6 +617,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         if len(vertices_in_cylinder) > 0:
             volumes_in_cylinder = self.mesh.nodes.bridge_adjacencies(vertices_in_cylinder,
                                                                     "edges", "volumes").ravel()
+
+            if volumes_in_cylinder.dtype == "object":
+                volumes_in_cylinder = np.concatenate(volumes_in_cylinder)
+
             volumes_in_cylinder = np.unique(volumes_in_cylinder)
             volumes_vug_value = self.mesh.vug[volumes_in_cylinder].flatten()
             non_vug_volumes = volumes_in_cylinder[volumes_vug_value == 0]
