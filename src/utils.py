@@ -1,6 +1,43 @@
 import numpy as np
 from math import acos
 
+def rotation_to_align(a, b):
+    """
+    Compute the rotation matrix of a into b using
+    Rodrigues' formula, i.e., the rotation that will
+    align a and b.
+
+    Parameters
+    ----------
+    a: numpy.array
+        A vector.
+    b: numpy.array
+        Another vector.
+    """
+    # Define an axis of rotation.
+    normal = np.cross(a, b)
+    n = normal / np.linalg.norm(normal)
+
+    # Compute the cosine and sine of the rotation angle.
+    d = np.linalg.norm(a) * np.linalg.norm(b)
+    c = a.dot(b) / d
+    s = (1 - c ** 2) ** 0.5
+
+    # The identity.
+    I = np.eye(3)
+
+    # The cross-product matrix.
+    K = np.array([
+            0.0, -n[2], n[1],
+            n[2], 0.0, -n[0],
+            -n[1], n[0], 0.0]).reshape((3,3))
+
+    if np.abs(1 + c) < 1e-8 or np.abs(1 - c) < 1e-8:
+        return I
+    
+    R = I + s * K + (1 - c) * (K.dot(K))
+
+    return R.T
 
 def angle_between(u, v):
     """
