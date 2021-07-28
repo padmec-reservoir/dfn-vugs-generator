@@ -2,7 +2,7 @@ import numpy as np
 from scipy.special import comb
 from pymoab import rng
 from preprocessor.meshHandle.finescaleMesh import FineScaleMesh
-from .utils import angle_between
+from .utils import rotation_to_align
 
 
 class DFNMeshGenerator(object):
@@ -662,29 +662,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         u = np.array([d / 2, 0.0, 0.0])
         v = c1 - center
 
-        # Rotate u onto v's projection onto the xy plane.
-        u_proj_xy = u[[0, 1]]
-        v_proj_xy = v[[0, 1]]
-        gamma = angle_between(u_proj_xy, v_proj_xy)
-        R_z = self.get_rotation_matrix(np.array([0.0, 0.0, gamma]))
-        u_rot_z = u.dot(R_z.T)
-
-        # Rotate u onto v's projection onto the x'z plane.
-        u_proj_xz = u_rot_z[[0, 2]]
-        v_proj_xz = v[[0, 2]]
-        beta = angle_between(u_proj_xz, v_proj_xz)
-
-        z_orientation = np.cross(u_proj_xy, v_proj_xy)
-        y_orientation = np.cross(u_proj_xz, v_proj_xz)
-
-        # Fix sense of rotation angles.
-        if y_orientation < 0:
-            beta *= -1
-        if z_orientation > 0:
-            gamma *= -1
-        
-        rotation_angles = np.array([0.0, beta, gamma])
-        R = self.get_rotation_matrix(rotation_angles)
+        R = rotation_to_align(u, v)
 
         # Compute the rotated axis.
         rotated_ax = np.array([1.0, 0.0, 0.0]).dot(R)
@@ -734,29 +712,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         u = np.array([params[0], 0.0, 0.0])
         v = c1 - center
 
-        # Rotate u onto v's projection onto the xy plane.
-        u_proj_xy = u[[0, 1]]
-        v_proj_xy = v[[0, 1]]
-        gamma = angle_between(u_proj_xy, v_proj_xy)
-        R_z = self.get_rotation_matrix(np.array([0.0, 0.0, gamma]))
-        u_rot_z = u.dot(R_z.T)
-
-        # Rotate u onto v's projection onto the x'z plane.
-        u_proj_xz = u_rot_z[[0, 2]]
-        v_proj_xz = v[[0, 2]]
-        beta = angle_between(u_proj_xz, v_proj_xz)
-
-        z_orientation = np.cross(u_proj_xy, v_proj_xy)
-        y_orientation = np.cross(u_proj_xz, v_proj_xz)
-
-        # Fix sense of rotation angles.
-        if y_orientation < 0:
-            beta *= -1
-        if z_orientation > 0:
-            gamma *= -1
-
-        rotation_angles = np.array([0.0, beta, gamma])
-        R = self.get_rotation_matrix(rotation_angles)
+        R = rotation_to_align(u, v)
 
         vertices = self.mesh.nodes.coords[:]
         X = (vertices - center).dot(R.T)
