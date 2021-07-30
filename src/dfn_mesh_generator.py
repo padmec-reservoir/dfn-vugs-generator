@@ -1,3 +1,4 @@
+from typing import Iterable
 import numpy as np
 from scipy.special import comb
 from pymoab import rng
@@ -165,7 +166,7 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
             L = np.linalg.norm(centers[e1] - centers[e2])   # Length
             h = 10 / L  # Height
 
-            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
+            print("Creating fracture {} of {}".format(i + 1, self.num_fractures))
             self.check_intersections(h, L, centers[e1], centers[e2])
 
     def get_random_ellipsis(self, x_range, y_range):
@@ -301,8 +302,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
     A 3D mesh generator for fracured and vuggy reservoirs.
     """
 
-    def __init__(self, mesh_file, ellipsis_params_range,
-                 num_fractures, num_ellipsoids=0, fracture_shape="cylinder"):
+    def __init__(self, mesh_file: str, num_free_fractures: int,
+                 num_connected_fractures: int = 0,
+                 num_ellipsoids: int = 0, ellipsoid_params_range: Iterable = None,
+                 fracture_shape: str = "cylinder"):
         """
         Constructor method.
 
@@ -331,15 +334,23 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             pairs of ellipsoids.
 
         """
-        self.mesh = FineScaleMesh(mesh_file)
-        self.ellipsis_params_range = ellipsis_params_range
-        self.num_ellipsoids = num_ellipsoids
-        if num_ellipsoids > 0 and num_fractures > comb(self.num_ellipsoids, 2):
+        if num_ellipsoids == 0 and num_connected_fractures > 0:
+            raise ValueError(
+                "Cannot generate fractures connecting vugs if the number of vugs is 0.")
+        elif num_ellipsoids > 0 and num_connected_fractures > comb(num_ellipsoids, 2):
             raise ValueError(
                 "The number of fractures must be inferior to the number of possible pairs of ellipsoids.")
-        self.num_fractures = num_fractures
+        elif num_ellipsoids > 0 and ellipsoid_params_range is None:
+            raise ValueError("Please specify the range of parameters for vug ellipsoids.")
+    
         if fracture_shape not in ("cylinder", "box", "ellipsoid"):
             raise ValueError("Invalid shape for fractures.")
+        
+        self.mesh = FineScaleMesh(mesh_file)
+        self.ellipsoid_params_range = ellipsoid_params_range
+        self.num_ellipsoids = num_ellipsoids
+        self.num_connected_fractures = num_connected_fractures
+        self.num_free_fractures = num_free_fractures
         self.fracture_shape = fracture_shape
         self.random_rng = np.random.default_rng()
 
@@ -354,25 +365,31 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         y_range = ys.min(), ys.max()
         z_range = zs.min(), zs.max()
 
-        if self.num_ellipsoids > 0:
-            print('Computing vugs')
-            centers, params, angles = self.get_random_ellipsoids(x_range, y_range, z_range)
-            vols_per_ellipsoid = self.compute_vugs(centers, angles, params, centroids)
-        else:
-            vols_per_ellipsoid = []
-            num_endpoints = 2 * self.num_fractures
-            centers = np.zeros((num_endpoints, 3))
-            centers[:, 0] = self.random_rng.uniform(
-                low=x_range[0], high=x_range[1], size=num_endpoints)
-            centers[:, 1] = self.random_rng.uniform(
-                low=y_range[0], high=y_range[1], size=num_endpoints)
-            centers[:, 2] = self.random_rng.uniform(
-                low=z_range[0], high=z_range[1], size=num_endpoints)
+        # Generate the vugs to supplied specs.
+        print("Computing vugs.")
 
+        centers, params, angles = self.get_random_ellipsoids(x_range, y_range, z_range)
+        vols_per_ellipsoid = self.compute_vugs(centers, angles, params, centroids)
 
-        print('Computing fractures')
-        self.compute_fractures(vols_per_ellipsoid, centers)
-        print('Done!')
+        # Generate free fractures to specs.
+        print("Computing free fractures.")
+
+        num_endpoints = 2 * self.num_free_fractures
+        pseudo_centers = np.zeros((num_endpoints, 3))
+        pseudo_centers[:, 0] = self.random_rng.uniform(
+            low=x_range[0], high=x_range[1], size=num_endpoints)
+        pseudo_centers[:, 1] = self.random_rng.uniform(
+            low=y_range[0], high=y_range[1], size=num_endpoints)
+        pseudo_centers[:, 2] = self.random_rng.uniform(
+            low=z_range[0], high=z_range[1], size=num_endpoints)
+
+        self.compute_fractures(self.num_free_fractures, vols_per_ellipsoid, pseudo_centers, True)
+
+        # Generate fractures connecting vugs.
+        print("Computing fractures between vugs.")
+        self.compute_fractures(self.num_connected_fractures, vols_per_ellipsoid, centers, False)
+
+        print("Done!")
 
     def compute_vugs(self, centers, angles, params, centroids):
         """
@@ -417,7 +434,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         return vols_per_ellipsoid
 
-    def compute_fractures(self, vols_per_ellipsoid, centers):
+    def compute_fractures(self, num_fractures, vols_per_ellipsoid, centers, is_free):
         """
         Generate fractures according to the instance parameters 
         `fracture_shape` and `num_fractures`.
@@ -438,13 +455,13 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         """
         if self.fracture_shape == "cylinder":
-            self.compute_fractures_as_cylinders(vols_per_ellipsoid, centers)
+            self.compute_fractures_as_cylinders(num_fractures, vols_per_ellipsoid, centers, is_free)
         elif self.fracture_shape == "box":
-            self.compute_fractures_as_boxes(vols_per_ellipsoid, centers)
+            self.compute_fractures_as_boxes(num_fractures, vols_per_ellipsoid, centers, is_free)
         elif self.fracture_shape == "ellipsoid":
-            self.compute_fractures_as_ellipsoids(vols_per_ellipsoid, centers)
+            self.compute_fractures_as_ellipsoids(num_fractures, vols_per_ellipsoid, centers, is_free)
 
-    def compute_fractures_as_cylinders(self, vols_per_ellipsoid, centers):
+    def compute_fractures_as_cylinders(self, num_fractures, vols_per_ellipsoid, centers, is_free):
         """
         Generates random fractures shaped as cylinders connecting two vugs, 
         and computes the volumes inside them. If a volumes is inside a 
@@ -468,25 +485,26 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         """
         selected_pairs = []
         count = 0
-        for i in range(self.num_fractures):
-            if self.num_ellipsoids > 0:
-                # If vugs were generated, find a pair of ellipsoids that are 
-                # not overlapped and are not already connected by a fracture.
-                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
-            else:
-                # Else, pick the generated centers in order.
+        for i in range(num_fractures):
+            if is_free:
+                # If free fractures are being generated, then just use the
+                # pseudo-centers in order.
                 e1, e2 = count, count + 1
                 count += 2
+            else:
+                # Else, vugs were generated, so find a pair of ellipsoids that are 
+                # not overlapped and are not already connected by a fracture.
+                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
 
             # Calculating the cylinder's parameters.
             L = np.linalg.norm(centers[e1] - centers[e2])   # Length
             r = 10 / L  # Radius
 
-            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
+            print("Creating fracture {} of {}".format(i+1, num_fractures))
             self.check_intersections_for_cylinders(
                 r, L, centers[e1], centers[e2])
 
-    def compute_fractures_as_boxes(self, vols_per_ellipsoid, centers):
+    def compute_fractures_as_boxes(self, num_fractures, vols_per_ellipsoid, centers, is_free):
         """
         Generates random fractures shaped as boxes connecting two vugs, 
         and computes the volumes inside them. If a volumes is inside a 
@@ -518,25 +536,26 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         selected_pairs = []
         count = 0
-        for i in range(self.num_fractures):
-            if self.num_ellipsoids > 0:
-                # If vugs were generated, find a pair of ellipsoids that are 
-                # not overlapped and are not already connected by a fracture.
-                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
-            else:
-                # Else, pick the generated centers in order.
+        for i in range(num_fractures):
+            if is_free:
+                # If free fractures are being generated, then just use the
+                # pseudo-centers in order.
                 e1, e2 = count, count + 1
                 count += 2
+            else:
+                # Else, vugs were generated, so find a pair of ellipsoids that are 
+                # not overlapped and are not already connected by a fracture.
+                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
 
             d = np.linalg.norm(centers[e1] - centers[e2])
             l = min_length if min_length > d / 20 else d / 20
             h = min_height
 
-            print("Creating fracture {} of {}".format(i+1, self.num_fractures))
+            print("Creating fracture {} of {}".format(i + 1, num_fractures))
             self.check_intersections_for_boxes(
                 centers[e1], centers[e2], d, l, h)
 
-    def compute_fractures_as_ellipsoids(self, vols_per_ellipsoid, centers):
+    def compute_fractures_as_ellipsoids(self, num_fractures, vols_per_ellipsoid, centers, is_free):
         """
         Generates random fractures shaped as ellipsoids connecting two vugs, 
         and computes the volumes inside them. If a volumes is inside a 
@@ -567,18 +586,19 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         selected_pairs = []
         count = 0
-        for i in range(self.num_fractures):
-            if self.num_ellipsoids > 0:
-                # If vugs were generated, find a pair of ellipsoids that are 
-                # not overlapped and are not already connected by a fracture.
-                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
-            else:
-                # Else, pick the generated centers in order.
+        for i in range(num_fractures):
+            if is_free:
+                # If free fractures are being generated, then just use the
+                # pseudo-centers in order.
                 e1, e2 = count, count + 1
                 count += 2
+            else:
+                # Else, vugs were generated, so find a pair of ellipsoids that are 
+                # not overlapped and are not already connected by a fracture.
+                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
 
             print("Creating fracture {} of {}".format(
-                i + 1, self.num_fractures))
+                i + 1, num_fractures))
 
             c1, c2 = centers[e1], centers[e2]
             d = np.linalg.norm(c1 - c2)
@@ -856,6 +876,9 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             The rotation angles for each ellipsoid.
 
         """
+        if self.num_ellipsoids == 0:
+            return [], [], []
+
         random_centers = np.zeros((self.num_ellipsoids, 3))
 
         random_centers[:, 0] = self.random_rng.uniform(
@@ -864,8 +887,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             low=y_range[0], high=y_range[1], size=self.num_ellipsoids)
         random_centers[:, 2] = self.random_rng.uniform(
             low=z_range[0], high=z_range[1], size=self.num_ellipsoids)
-        random_params = self.random_rng.uniform(low=self.ellipsis_params_range[0],
-                                                high=self.ellipsis_params_range[1],
+        random_params = self.random_rng.uniform(low=self.ellipsoid_params_range[0],
+                                                high=self.ellipsoid_params_range[1],
                                                 size=(self.num_ellipsoids, 3))
         random_angles = self.random_rng.uniform(
             low=0.0, high=2*np.pi, size=(self.num_ellipsoids, 3))
