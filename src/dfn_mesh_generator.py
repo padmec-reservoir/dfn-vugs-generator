@@ -166,7 +166,8 @@ class DFNMeshGenerator2D(DFNMeshGenerator):
             L = np.linalg.norm(centers[e1] - centers[e2])   # Length
             h = 10 / L  # Height
 
-            print("Creating fracture {} of {}".format(i + 1, self.num_fractures))
+            print("Creating fracture {} of {}".format(
+                i + 1, self.num_fractures))
             self.check_intersections(h, L, centers[e1], centers[e2])
 
     def get_random_ellipsis(self, x_range, y_range):
@@ -341,11 +342,12 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             raise ValueError(
                 "The number of fractures must be inferior to the number of possible pairs of ellipsoids.")
         elif num_ellipsoids > 0 and ellipsoid_params_range is None:
-            raise ValueError("Please specify the range of parameters for vug ellipsoids.")
-    
+            raise ValueError(
+                "Please specify the range of parameters for vug ellipsoids.")
+
         if fracture_shape not in ("cylinder", "box", "ellipsoid"):
             raise ValueError("Invalid shape for fractures.")
-        
+
         self.mesh = FineScaleMesh(mesh_file)
         self.ellipsoid_params_range = ellipsoid_params_range
         self.num_ellipsoids = num_ellipsoids
@@ -368,8 +370,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         # Generate the vugs to supplied specs.
         print("Computing vugs.")
 
-        centers, params, angles = self.get_random_ellipsoids(x_range, y_range, z_range)
-        vols_per_ellipsoid = self.compute_vugs(centers, angles, params, centroids)
+        centers, params, angles = self.get_random_ellipsoids(
+            x_range, y_range, z_range)
+        vols_per_ellipsoid = self.compute_vugs(
+            centers, angles, params, centroids)
 
         # Generate free fractures to specs.
         print("Computing free fractures.")
@@ -383,11 +387,13 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         pseudo_centers[:, 2] = self.random_rng.uniform(
             low=z_range[0], high=z_range[1], size=num_endpoints)
 
-        self.compute_fractures(self.num_free_fractures, vols_per_ellipsoid, pseudo_centers, True)
+        self.compute_fractures(self.num_free_fractures,
+                               vols_per_ellipsoid, pseudo_centers, True)
 
         # Generate fractures connecting vugs.
         print("Computing fractures between vugs.")
-        self.compute_fractures(self.num_connected_fractures, vols_per_ellipsoid, centers, False)
+        self.compute_fractures(self.num_connected_fractures,
+                               vols_per_ellipsoid, centers, False)
 
         print("Done!")
 
@@ -455,11 +461,14 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         """
         if self.fracture_shape == "cylinder":
-            self.compute_fractures_as_cylinders(num_fractures, vols_per_ellipsoid, centers, is_free)
+            self.compute_fractures_as_cylinders(
+                num_fractures, vols_per_ellipsoid, centers, is_free)
         elif self.fracture_shape == "box":
-            self.compute_fractures_as_boxes(num_fractures, vols_per_ellipsoid, centers, is_free)
+            self.compute_fractures_as_boxes(
+                num_fractures, vols_per_ellipsoid, centers, is_free)
         elif self.fracture_shape == "ellipsoid":
-            self.compute_fractures_as_ellipsoids(num_fractures, vols_per_ellipsoid, centers, is_free)
+            self.compute_fractures_as_ellipsoids(
+                num_fractures, vols_per_ellipsoid, centers, is_free)
 
     def compute_fractures_as_cylinders(self, num_fractures, vols_per_ellipsoid, centers, is_free):
         """
@@ -492,9 +501,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                 e1, e2 = count, count + 1
                 count += 2
             else:
-                # Else, vugs were generated, so find a pair of ellipsoids that are 
+                # Else, vugs were generated, so find a pair of ellipsoids that are
                 # not overlapped and are not already connected by a fracture.
-                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
+                e1, e2 = self._find_a_pair_of_vugs(
+                    vols_per_ellipsoid, selected_pairs)
 
             # Calculating the cylinder's parameters.
             L = np.linalg.norm(centers[e1] - centers[e2])   # Length
@@ -529,8 +539,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         # Compute minimal parameter size for boxes.
         all_edges_endpoints = self.mesh.edges.connectivities[:]
         N = len(all_edges_endpoints)
-        all_edges_coords = self.mesh.nodes.coords[all_edges_endpoints.flatten()].reshape((N, 2, 3))
-        edges_length = np.linalg.norm(all_edges_coords[:, 0, :] - all_edges_coords[:, 1, :], axis=1)
+        all_edges_coords = self.mesh.nodes.coords[all_edges_endpoints.flatten()].reshape(
+            (N, 2, 3))
+        edges_length = np.linalg.norm(
+            all_edges_coords[:, 0, :] - all_edges_coords[:, 1, :], axis=1)
         min_height = edges_length.min()
         min_length = edges_length.max()
 
@@ -543,9 +555,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                 e1, e2 = count, count + 1
                 count += 2
             else:
-                # Else, vugs were generated, so find a pair of ellipsoids that are 
+                # Else, vugs were generated, so find a pair of ellipsoids that are
                 # not overlapped and are not already connected by a fracture.
-                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
+                e1, e2 = self._find_a_pair_of_vugs(
+                    vols_per_ellipsoid, selected_pairs)
 
             d = np.linalg.norm(centers[e1] - centers[e2])
             l = min_length if min_length > d / 20 else d / 20
@@ -580,8 +593,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         # Compute minimal parameter size for ellipsoids.
         all_edges_endpoints = self.mesh.edges.connectivities[:]
         N = len(all_edges_endpoints)
-        all_edges_coords = self.mesh.nodes.coords[all_edges_endpoints.flatten()].reshape((N, 2, 3))
-        edges_length = np.linalg.norm(all_edges_coords[:, 0, :] - all_edges_coords[:, 1, :], axis=1)
+        all_edges_coords = self.mesh.nodes.coords[all_edges_endpoints.flatten()].reshape(
+            (N, 2, 3))
+        edges_length = np.linalg.norm(
+            all_edges_coords[:, 0, :] - all_edges_coords[:, 1, :], axis=1)
         param_c = edges_length.min()
 
         selected_pairs = []
@@ -593,9 +608,10 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
                 e1, e2 = count, count + 1
                 count += 2
             else:
-                # Else, vugs were generated, so find a pair of ellipsoids that are 
+                # Else, vugs were generated, so find a pair of ellipsoids that are
                 # not overlapped and are not already connected by a fracture.
-                e1, e2 = self._find_a_pair_of_vugs(vols_per_ellipsoid, selected_pairs)
+                e1, e2 = self._find_a_pair_of_vugs(
+                    vols_per_ellipsoid, selected_pairs)
 
             print("Creating fracture {} of {}".format(
                 i + 1, num_fractures))
@@ -648,7 +664,7 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             proj_vertices >= 0) & (proj_vertices <= L)]
         if len(vertices_in_cylinder) > 0:
             volumes_in_cylinder = self.mesh.nodes.bridge_adjacencies(vertices_in_cylinder,
-                                                                    "edges", "volumes").ravel()
+                                                                     "edges", "volumes").ravel()
 
             if volumes_in_cylinder.dtype == "object":
                 volumes_in_cylinder = np.concatenate(volumes_in_cylinder)
@@ -707,16 +723,18 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         vertices_in_x_range = np.abs(X.dot(rotated_ax)) <= (d / 2)
         vertices_in_y_range = np.abs(X.dot(rotated_ay)) <= (l / 2)
         vertices_in_z_range = np.abs(X.dot(rotated_az)) <= (h / 2)
-        vertices_handles = self.mesh.nodes.all[vertices_in_x_range & vertices_in_y_range & vertices_in_z_range]
+        vertices_handles = self.mesh.nodes.all[vertices_in_x_range &
+                                               vertices_in_y_range & vertices_in_z_range]
 
         if len(vertices_handles) > 0:
             vols_in_fracture = np.concatenate(self.mesh.nodes.bridge_adjacencies(
                 vertices_handles, "edges", "volumes")).ravel()
             unique_vols_in_fracture = np.unique(vols_in_fracture)
-            unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
+            unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten(
+            )
             non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
             self.mesh.vug[non_vug_volumes] = 2
-        
+
         self._check_intersections_along_axis(c1, c2)
 
     def check_intersections_for_ellipsoids(self, c1, c2, params):
@@ -755,10 +773,11 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
             vols_in_fracture = np.concatenate(self.mesh.nodes.bridge_adjacencies(
                 vertices_handles, "edges", "volumes")).ravel()
             unique_vols_in_fracture = np.unique(vols_in_fracture)
-            unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten()
+            unique_volumes_vug_values = self.mesh.vug[unique_vols_in_fracture].flatten(
+            )
             non_vug_volumes = unique_vols_in_fracture[unique_volumes_vug_values == 0]
             self.mesh.vug[non_vug_volumes] = 2
-        
+
         self._check_intersections_along_axis(c1, c2)
 
     def _check_intersections_along_axis(self, c1, c2):
@@ -772,12 +791,13 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
 
         # Plane parameters of each face.
         R_0 = faces_vertices[:, 0, :]
-        N = np.cross(faces_vertices[:, 1, :] - R_0, faces_vertices[:, 2, :] - R_0)
+        N = np.cross(faces_vertices[:, 1, :] - R_0,
+                     faces_vertices[:, 2, :] - R_0)
 
         # Compute the parameters of the main axis line.
         num = np.einsum("ij,ij->i", N, R_0 - c1)
         denom = N.dot(c2 - c1)
-        
+
         non_zero_denom = denom[np.abs(denom) > 1e-6]
         non_zero_num = num[np.abs(denom) > 1e-6]
         r = non_zero_num / non_zero_denom
@@ -795,7 +815,8 @@ class DFNMeshGenerator3D(DFNMeshGenerator):
         # line and check if such point is in the face.
         angle_sum = np.zeros(filtered_nodes.shape[0])
         for i in range(num_vertices_of_volume):
-            p0, p1 = filtered_nodes[:, i, :], filtered_nodes[:, (i+1) % num_vertices_of_volume, :]
+            p0, p1 = filtered_nodes[:, i, :], filtered_nodes[:,
+                                                             (i+1) % num_vertices_of_volume, :]
             a = p0 - P
             b = p1 - P
             norm_prod = np.linalg.norm(a, axis=1)*np.linalg.norm(b, axis=1)
